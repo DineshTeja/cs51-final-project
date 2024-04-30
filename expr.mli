@@ -22,6 +22,7 @@ type binop =
   | Fplus
   | Fminus
   | Ftimes
+  | Fdivide
   | Power
   | Concat
 ;;

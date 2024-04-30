@@ -20,6 +20,7 @@ type binop =
   | Fplus
   | Fminus
   | Ftimes
+  | Fdivide
   | Power
   | Concat
 ;;
@@ -94,7 +95,7 @@ let rec free_vars (exp : expr) : varidset =
    "var" and a running counter a la `gensym`. Assumes no other
    variable names use the prefix "var". (Otherwise, they might
    accidentally be the same as a generated variable name.) *)
-let new_varname : unit -> varid =
+let new_varname : unit -> varid = 
   let counter = ref 0 in 
   fun () ->
    let count = !counter in
@@ -142,11 +143,13 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
 		else 
 			Let (x, subst var_name repl expr1, subst var_name repl expr2)
 	| Letrec (x, expr1, expr2) -> 
-		if x = var_name then Letrec (x, subst var_name repl expr1, expr2)
+		(* if x = var_name then Letrec (x, subst var_name repl expr1, expr2) *)
+    if x = var_name then Letrec (x, expr1, expr2)
 		else if x <> var_name && x |> is_fv_of repl then
 			let new_var = new_varname () in
 			Letrec (new_var, 
-              subst var_name repl expr1, 
+              (* subst var_name repl expr1,  *)
+              subst var_name repl (subst x (Var new_var) expr1),
               subst var_name repl (subst x (Var new_var) expr2))
 		else 
 			Letrec (x, subst var_name repl expr1, subst var_name repl expr2)
@@ -155,7 +158,7 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
   | List exprs -> List (List.map (subst var_name repl) exprs)
   | ListCons (e1, e2) -> ListCons (subst var_name repl e1, subst var_name repl e2)
   | ListAppend (e1, e2) -> ListAppend (subst var_name repl e1, subst var_name repl e2)
-    ;;
+;;
 
 (*......................................................................
   String representations of expressions
@@ -206,6 +209,7 @@ let rec exp_to_concrete_string (exp : expr) : string =
   | App (expr1, expr2) -> 
     exp_to_concrete_string expr1 ^ " " ^ exp_to_concrete_string expr2
 ;;
+
 (* exp_to_abstract_string exp -- Return a string representation of the
    abstract syntax of the expression `exp` *)
 let rec exp_to_abstract_string (exp : expr) : string =

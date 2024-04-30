@@ -98,6 +98,7 @@ module Env : ENV =
             exp_str
  end 
 ;;
+
 (*......................................................................
   Evaluation functions
 
@@ -126,6 +127,42 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
 
+
+(* Helper to evaluate binary operations (used in eval_s, eval_d, eval_l *)
+let eval_binop (eval_fn : expr -> Env.env -> Env.value) 
+               (binop : binop) 
+               (expr1 : expr) 
+               (expr2 : expr) 
+               (env : Env.env) : Env.value =
+  let val1 = eval_fn expr1 env in
+  let val2 = eval_fn expr2 env in
+  match (val1, val2) with
+  | (Env.Val Num x, Env.Val Num y) ->
+    (match binop with
+    | Plus -> Env.Val (Num (x + y))
+    | Minus -> Env.Val (Num (x - y))
+    | Times -> Env.Val (Num (x * y))
+    | Equals -> Env.Val (Bool (x = y))
+    | LessThan -> Env.Val (Bool (x < y))
+    | _ -> raise (EvalError "float operation on int"))
+  | (Env.Val Float x, Env.Val Float y) ->
+    (match binop with
+    | Fplus -> Env.Val (Float (x +. y))
+    | Fminus -> Env.Val (Float (x -. y))
+    | Ftimes -> Env.Val (Float (x *. y))
+    | Fdivide -> if y = 0.0 then raise (EvalError "Division by zero") 
+                 else Env.Val (Float (x /. y))
+    | Equals -> Env.Val (Bool (x = y))
+    | LessThan -> Env.Val (Bool (x < y))
+    | Power -> Env.Val (Float (x ** y))
+    | _ -> raise (EvalError "int operation on float"))
+  | (Env.Val String s1, Env.Val String s2) ->
+    (match binop with
+    | Concat -> Env.Val (String (s1 ^ s2))
+    | _ -> raise (EvalError "string operation on non-concat"))
+  | _ -> raise (EvalError "binop on non-compatible types")
+
+
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
 let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
   let extract_expr (expr : expr) : expr = 
@@ -140,44 +177,17 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
   | Unop (_, expr) -> (match extract_expr expr with 
                          | Num x -> Env.Val (Num (~- x))            
                          | _ -> raise (EvalError "unop on non-integer"))
-   | Binop (binop, expr1, expr2) -> 
-       (match eval_s expr1 _env, eval_s expr2 _env with
-       | Env.Val Num x, Env.Val Num y -> 
-         (match binop with 
-         | Plus -> Env.Val (Num (x + y))
-         | Minus -> Env.Val (Num (x - y))
-         | Times -> Env.Val (Num (x * y))
-         | Equals -> Env.Val (Bool (x = y))
-         | LessThan -> Env.Val (Bool (x < y))
-         | _ -> raise (EvalError "float operation on int"))
-       | Env.Val Bool x, Env.Val Bool y -> 
-         (match binop with 
-         | Equals -> Env.Val (Bool (x = y))
-         | LessThan -> Env.Val (Bool (x < y))
-         | _ -> raise (EvalError "binop type mismatch"))
-       | Env.Val Float x, Env.Val Float y -> 
-         (match binop with 
-         | Fplus -> Env.Val (Float (x +. y))
-         | Fminus -> Env.Val (Float (x -. y))
-         | Ftimes -> Env.Val (Float (x *. y))
-         | Equals -> Env.Val (Bool (x = y))
-         | LessThan -> Env.Val (Bool (x < y))
-         | Power -> Env.Val (Float (x ** y))
-         | _ -> raise (EvalError "int operation on float"))
-       | Env.Val String s1, Env.Val String s2 -> 
-         (match binop with
-         | Concat -> Env.Val (String (s1 ^ s2))
-         | _ -> raise (EvalError "string operation on non-concat"))
-       | _ -> raise (EvalError "binop on non-compatible types"))
+  | Binop (binop, expr1, expr2) -> eval_binop eval_s binop expr1 expr2 _env
   | Conditional (expr1, expr2, expr3) -> 
       (match eval_s expr1 _env with
       | Env.Val Bool b -> if b then eval_s expr2 _env else eval_s expr3 _env 
       | _ -> raise (EvalError "non-boolean in conditional"))
-  (* ---IMPLEMENT LIST LOGIC HERE --- *)
+  (* -------------LIST EXTENSION--------------- *)
   | List exprs -> 
     Env.Val (List (List.map (fun e -> match eval_s e _env with
                                       | Env.Val v -> v
-                                      | _ -> raise (EvalError "Invalid list expression")) exprs))
+                                      | _ -> raise (EvalError 
+                                            "Invalid list expression")) exprs))
   | ListCons (e1, e2) ->
     (match eval_s e1 _env, eval_s e2 _env with
      | Env.Val v1, Env.Val (List l) -> Env.Val (List (v1 :: l))
@@ -187,6 +197,7 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
       (match eval_s e1 _env, eval_s e2 _env with
       | Env.Val (List l1), Env.Val (List l2) -> Env.Val (List (l1 @ l2))
       | _ -> raise (EvalError "Invalid operands for ListAppend"))
+  (* ----------------------------------------- *)
   | Let (x, expr1, expr2) -> eval_s (subst x (extract_expr expr1) expr2) _env
   | Letrec (x, expr1, expr2) -> 
       let vd = extract_expr expr1 in 
@@ -202,23 +213,18 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
       | _ -> raise (EvalError "function application on non-function");;
 
 
-type environmental = 
-  | Dynamic
-  | Lexical ;;
+type envspec = | Dynamic | Lexical ;;
 
 (* Environment evaluators: use eval_envir helper *)
-let rec eval_envir (exp : expr) 
+let rec eval_env (exp : expr) 
                    (env : Env.env) 
-                   (env_type : environmental) 
+                   (env_type : envspec) 
                    : Env.value  =
-  let extract_expr (expr : expr) 
-                   (envir : Env.env) 
-                   (env_type : environmental) 
-                   : expr = 
-    match eval_envir expr envir env_type with 
+  let extract_expr (expr : expr) (envir : Env.env) (env_type : envspec) : expr = 
+    match eval_env expr envir env_type with 
     | Env.Val exp -> exp 
-    | Env.Closure (_, _) -> raise (EvalError "closure not expected") in
-
+    | Env.Closure (_, _) -> raise (EvalError "closure not expected")
+  in
   match exp with 
   | Num _ | Bool _ | Float _ | String _ -> Env.Val exp  
   | Fun _ -> 
@@ -232,94 +238,66 @@ let rec eval_envir (exp : expr)
                          | Float x -> Env.Val (Float (~-. x))
                          | _ -> raise (EvalError "unop on non-integer"))
   | Binop (binop, expr1, expr2) -> 
-      (match eval_envir expr1 env env_type, eval_envir expr2 env env_type with
-      | Env.Val Num x, Env.Val Num y -> 
-        (match binop with 
-        | Plus -> Env.Val (Num (x + y))
-        | Minus -> Env.Val (Num (x - y))
-        | Times -> Env.Val (Num (x * y))
-        | Equals -> Env.Val (Bool (x = y))
-        | LessThan -> Env.Val (Bool (x < y))
-        | _ -> raise (EvalError "float operation on int"))
-      | Env.Val Bool x, Env.Val Bool y -> 
-        (match binop with 
-        | Equals -> Env.Val (Bool (x = y))
-        | LessThan -> Env.Val (Bool (x < y))
-        | _ -> raise (EvalError "binop type mismatch"))
-      | Env.Val Float x, Env.Val Float y -> 
-        (match binop with 
-        | Fplus -> Env.Val (Float (x +. y))
-        | Fminus -> Env.Val (Float (x -. y))
-        | Ftimes -> Env.Val (Float (x *. y))
-        | Equals -> Env.Val (Bool (x = y))
-        | LessThan -> Env.Val (Bool (x < y))
-        | Power -> Env.Val (Float (x ** y))
-        | _ -> raise (EvalError "int operation on float"))
-      | Env.Val String s1, Env.Val String s2 -> 
-        (match binop with
-        | Concat -> Env.Val (String (s1 ^ s2))
-        | _ -> raise (EvalError "string operation on non-concat"))
-      | _ -> raise (EvalError "binop on non-compatible types"))
+                         eval_binop (fun expr env -> eval_env expr env env_type) 
+                         binop expr1 expr2 env
   | Conditional (expr1, expr2, expr3) -> 
-      (match eval_envir expr1 env env_type with
-      | Env.Val Bool b -> if b then eval_envir expr2 env env_type 
-                          else eval_envir expr3 env env_type
+      (match eval_env expr1 env env_type with
+      | Env.Val Bool b -> if b then eval_env expr2 env env_type 
+                          else eval_env expr3 env env_type
       | _ -> raise (EvalError "non-boolean in conditional"))
   (* ---LIST EXTENSION--------------- *)
   | List exprs -> 
-    Env.Val (List (List.map (fun e -> match eval_envir e env env_type with
+    Env.Val (List (List.map (fun e -> match eval_env e env env_type with
                                       | Env.Val v -> v
-                                      | _ -> raise (EvalError "Invalid list expression")) exprs))
+                                      | _ -> raise (EvalError 
+                                             "Invalid list expression")) exprs))
   | ListCons (e1, e2) ->
-      (match eval_envir e1 env env_type, eval_envir e2 env env_type with
+      (match eval_env e1 env env_type, eval_env e2 env env_type with
       | Env.Val v1, Env.Val (List l) -> Env.Val (List (v1 :: l))
       | _ -> raise (EvalError "Invalid operands for ListCons"))
   | ListAppend (e1, e2) ->
-    (match eval_envir e1 env env_type, eval_envir e2 env env_type with
+    (match eval_env e1 env env_type, eval_env e2 env env_type with
       | Env.Val (List l1), Env.Val (List l2) -> Env.Val (List (l1 @ l2))
       | _ -> raise (EvalError "Both operands must be lists for ListAppend"))
   (*-----------------------------------*)
   | Let (x, expr1, expr2) -> 
-      eval_envir expr2 
-                 (Env.extend env x (ref (eval_envir expr1 env env_type))) 
-                 env_type
+      eval_env expr2 (Env.extend env x (ref (eval_env expr1 env env_type))) 
+                                                                  env_type
   | Letrec (x, expr1, expr2) ->
       (match env_type with 
       | Dynamic -> 
-        eval_envir expr2 
-                   (Env.extend env x (ref (eval_envir expr1 env env_type))) 
-                   env_type
+        eval_env expr2 (Env.extend env x (ref (eval_env expr1 env env_type))) 
+                                                                   env_type
       | Lexical -> 
         let temp = ref (Env.Val Unassigned) in 
-        temp := eval_envir expr1 (Env.extend env x temp) env_type; 
-        eval_envir expr2 (Env.extend env x temp) env_type)
+        temp := eval_env expr1 (Env.extend env x temp) env_type; 
+        eval_env expr2 (Env.extend env x temp) env_type)
   | Unassigned -> raise (EvalError "unassigned cannot be evaluated")
   | App (expr1, expr2) ->  
       (match env_type with 
       | Dynamic -> 
-        (match eval_envir expr1 env env_type with 
+        (match eval_env expr1 env env_type with 
         | Env.Val Fun (x, b) -> 
-          eval_envir b 
-                    (Env.extend env x (ref (eval_envir expr2 env env_type))) 
-                    env_type
+          eval_env b (Env.extend env x (ref (eval_env expr2 env env_type))) 
+                                                                  env_type
         | _ -> raise (EvalError "function application on non-function"))
       | Lexical -> 
-        match eval_envir expr1 env env_type with 
+        match eval_env expr1 env env_type with 
         | Env.Closure (Fun (x, b), env_l) -> 
-            eval_envir b 
-                       (Env.extend env_l x (ref (eval_envir expr2 env env_type))) 
+            eval_env b 
+                       (Env.extend env_l x (ref (eval_env expr2 env env_type))) 
                        env_type
         | _ -> raise (EvalError "function application on non-function"));;  
 
 (* The DYNAMICALLY-SCOPED ENVIRONMENT MODEL evaluator -- to be
    completed *)
 let eval_d (exp : expr) (env : Env.env) : Env.value =
-  eval_envir exp env Dynamic ;;
+  eval_env exp env Dynamic ;;
        
 (* The LEXICALLY-SCOPED ENVIRONMENT MODEL evaluator -- optionally
    completed as (part of) your extension *)
 let eval_l (exp : expr) (env : Env.env) : Env.value =
-  eval_envir exp env Lexical ;;
+  eval_env exp env Lexical ;;
 
 (* The EXTENDED evaluator -- if you want, you can provide your
    extension as a separate evaluator, or if it is type- and
@@ -337,4 +315,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_d ;;
+let evaluate = eval_l ;;

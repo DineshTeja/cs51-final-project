@@ -76,6 +76,9 @@ let eval_s_test () =
   unit_test (eval_s (Binop (Ftimes, Float 2.0, Float 3.0)) empty 
                    = value (Float 6.0))
              "eval_s 2.0 *. 3.0";
+  unit_test (eval_s (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+                   = value (Float 2.0))
+             "eval_s 6.0 /. 3.0";
   unit_test (eval_s (Binop (Concat, String "hello ", String "world")) empty 
                    = value (String "hello world"))
              "eval_s 'hello ' ^ 'world'";
@@ -85,7 +88,8 @@ let eval_s_test () =
   unit_test (eval_s (ListCons (Num 0, List [Num 1; Num 2])) empty 
                    = value (List [Num 0; Num 1; Num 2]))
              "eval_s 0 :: [1; 2]";
-  unit_test (eval_s (ListAppend (List [Num 1; Num 2], List [Num 3; Num 4])) empty 
+  unit_test (eval_s (ListAppend (List [Num 1; Num 2], 
+                                 List [Num 3; Num 4])) empty 
                    = value (List [Num 1; Num 2; Num 3; Num 4]))
              "eval_s [1; 2] @ [3; 4]";
   unit_test (eval_s (Let ("z", (Binop (Plus, Num 20, Num 22)), Var "z")) empty
@@ -99,14 +103,15 @@ let eval_s_test () =
                        Binop(Minus, Var ("x"), Num(1)))))), 
                     App(Var("f"), Num(5)))) empty
                = value (Num 120))
-           "eval_s let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
+       "eval_s let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
 
   unit_test (try 
             eval_s (Unassigned) empty = value (Unassigned)
             with EvalError "unassigned cannot be evaluated" -> true)
             "eval_s unassigned"; 
 
-  unit_test (eval_s (App ((Fun ("x", Binop (Times, Var "x", Num 10))), Num 12)) empty
+  unit_test (eval_s (App ((Fun ("x", Binop (Times, Var "x", 
+                                                   Num 10))), Num 12)) empty
                 = value (Num 120))
             "eval_s (fun x -> x * 10) 12";
   unit_test (try 
@@ -161,6 +166,10 @@ let eval_d_test () =
   unit_test (eval_d (Binop (Ftimes, Float 4.0, Float 3.0)) empty 
               = value (Float 12.0))
         "eval_d 4.0 *. 3.0";
+  
+  unit_test (eval_d (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+              = value (Float 2.0))
+        "eval_d 6.0 /. 3.0";
 
   unit_test (eval_d (Binop (LessThan, Float 3.5, Float 5.0)) empty 
               = value (Bool true))
@@ -174,11 +183,13 @@ let eval_d_test () =
               = value (Float 9.0))
         "eval_d 3.0 ** 2.0";
 
-  unit_test (eval_d (Conditional ((Binop (Equals, Num 5, Num 5)), (Num 1), (Num 2))) empty
+  unit_test (eval_d (Conditional ((Binop (Equals, Num 5, Num 5)), 
+                                         (Num 1), (Num 2))) empty
               = value (Num 1))
         "eval_d if 5 = 5 then 1 else 2";
 
-  unit_test (eval_d (Conditional ((Binop (Equals, Num 4, Num 5)), (Num 1), (Num 2))) env_num10
+  unit_test (eval_d (Conditional ((Binop (Equals, Num 4, Num 5)), 
+                                         (Num 1), (Num 2))) env_num10
               = value (Num 2))
         "eval_d if 4 = 5 then 1 else 2";
 
@@ -221,7 +232,8 @@ let eval_d_test () =
             = value (List [Num 0; Num 1; Num 2]))
             "eval_d 0 :: [1; 2]";
 
-  unit_test (eval_d (ListAppend (List [Num 1; Num 2], List [Num 3; Num 4])) empty 
+  unit_test (eval_d (ListAppend (List [Num 1; Num 2], 
+                                 List [Num 3; Num 4])) empty 
             = value (List [Num 1; Num 2; Num 3; Num 4]))
             "eval_d [1; 2] @ [3; 4]";
 
@@ -237,14 +249,15 @@ let eval_d_test () =
                           Binop(Minus, Var ("x"), Num(1)))))), 
                         App(Var("f"), Num(5)))) empty 
             = value (Num 120))
-            "eval_d let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
+        "eval_d let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
 
   unit_test (try 
               eval_d (Unassigned) empty = value (Unassigned)
               with EvalError "unassigned cannot be evaluated" -> true)
             "eval_d unassigned"; 
 
-  unit_test (eval_d (App ((Fun ("x", Binop (Times, Var "x", Num 10))), Num 12)) empty
+  unit_test (eval_d (App ((Fun ("x", Binop (Times, Var "x", 
+                                                  Num 10))), Num 12)) empty
             = value (Num 120))
             "eval_d (fun x -> x * 10) 12";
 
@@ -298,6 +311,9 @@ let eval_l_test () =
   unit_test (eval_l (Binop (Ftimes, Float 5.0, Float 2.5)) empty 
               = value (Float 12.5))
         "eval_l 5.0 *. 2.5";
+  unit_test (eval_d (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+        = value (Float 2.0))
+        "eval_d 6.0 /. 3.0";
   unit_test (eval_l (Binop (Equals, Float 5.0, Float 5.0)) empty 
               = value (Bool true))
         "eval_l 5.0 = 5.0";
@@ -308,10 +324,12 @@ let eval_l_test () =
               = value (Float 8.0))
         "eval_l 2.0 ** 3.0";
 
-  unit_test (eval_l (Conditional ((Binop (Equals, Num 3, Num 3)), (Num 1), (Num 2))) empty
+  unit_test (eval_l (Conditional ((Binop (Equals, Num 3, Num 3)), 
+                                         (Num 1), (Num 2))) empty
               = value (Num 1))
         "eval_l if 3 = 3 then 1 else 2";
-  unit_test (eval_l (Conditional ((Binop (Equals, Num 4, Num 3)), (Num 1), (Num 2))) env_num10
+  unit_test (eval_l (Conditional ((Binop (Equals, Num 4, Num 3)), 
+                                         (Num 1), (Num 2))) env_num10
               = value (Num 2))
         "eval_l if 4 = 3 then 1 else 2";
 
@@ -365,13 +383,15 @@ let eval_l_test () =
                           Binop(Minus, Var ("x"), Num(1)))))), 
                         App(Var("f"), Num(5)))) empty 
             = value (Num 120))
-            "eval_l let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
+        "eval_l let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
 
-            unit_test (eval_l (Letrec ("x", (Binop (Plus, Num 5, Num 2)), Var "x")) empty
+            unit_test (eval_l (Letrec ("x", (Binop (Plus, 
+                                                Num 5, Num 2)), Var "x")) empty
             = value (Num 7))
         "eval_l let rec x = 5 + 2 in x";
 
-  unit_test (eval_l (Letrec ("x", (Binop (Plus, Num 5, Num 2)), Var "x")) env_num10
+  unit_test (eval_l (Letrec ("x", (Binop (Plus, Num 5, 
+                                                Num 2)), Var "x")) env_num10
               = value (Num 7))
           "eval_l let rec x = 5 + 2 in x with x -> 10";
   unit_test (eval_l (Letrec 
@@ -382,18 +402,20 @@ let eval_l_test () =
                       Binop(Minus, Var ("x"), Num(1)))))), 
                   App(Var("f"), Num(5)))) empty 
               = value (Num 120))
-          "eval_l let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
+        "eval_l let rec f = fun x -> if x = 0 then 1 else x * f (x - 1) in f 5";
 
   unit_test (try 
           eval_l (Unassigned) empty = value (Unassigned)
         with EvalError "unassigned cannot be evaluated" -> true)
         "eval_l unassigned"; 
 
-  unit_test (eval_l (App ((Fun ("x", Binop (Times, Var "x", Num 10))), Num 12)) empty
+  unit_test (eval_l (App ((Fun ("x", Binop (Times, Var "x", 
+                                                   Num 10))), Num 12)) empty
               = value (Num 120))
           "eval_l (fun x -> x * 10) 12";
 
-  unit_test (eval_l (App ((Fun ("x", Binop (Times, Var "x", Num 10))), Num 12)) env_num10
+  unit_test (eval_l (App ((Fun ("x", Binop (Times, Var "x", 
+                                                  Num 10))), Num 12)) env_num10
               = value (Num 120))
           "eval_l (fun x -> x * 10) 12 with x -> 10";
 

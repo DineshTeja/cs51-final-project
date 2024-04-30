@@ -2,6 +2,7 @@ open Expr ;;
 open Evaluation ;; 
 open CS51Utils ;; 
 open Absbook ;;
+open Miniml ;;
 
 let freevars_test () = 
      let empty_set = vars_of_list [] in 
@@ -103,6 +104,7 @@ let freevars_test () =
 ;;
 
 let subst_test () =
+     unit_test (exp_to_abstract_string (subst "x" (Var "z") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(y))") "subst letrec test";
      unit_test ((subst "z" (Num 42) (Num 42)) = (Num 42))  
                     "subst 42 with 42"; 
      
@@ -163,6 +165,7 @@ let subst_test () =
                          (Let ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) 
                          = ((Let ("y", (Binop (Plus, Num 42, Num 2)), Num 42))))
                     "subst let y = z + 2 in z with z = 42";
+
      unit_test (subst "z" 
                          (Binop (Plus, Var "y", Num 1))
                          (Let ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) 
@@ -170,17 +173,27 @@ let subst_test () =
                               (Binop (Plus, (Binop (Plus, Var "y", Num 1)), Num 2)), 
                               (Binop (Plus, Var "y", Num 1))))))
                               "subst let y = z + 2 in z with z = y + 1";
+
+
+     unit_test (subst "x" (Num 5) (Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 10))) = Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 10)))
+               "subst letrec with shadowing";
+     unit_test (subst "y" (Num 5) (Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Var "y"))) = Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 5)))
+               "subst letrec without shadowing";
+
+     unit_test (exp_to_abstract_string (subst "x" (Var "z") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(y))") "subst letrec test";
+     unit_test (exp_to_abstract_string (subst "y" (Var "z") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(z))") "subst letrec test 2";
+     unit_test (exp_to_abstract_string (subst "z" (Var "x") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(y))") "subst letrec test 3";
               
-     unit_test (subst "z" 
-                         (Num 42)
-                         (Letrec ("z", (Binop (Plus, Var "z", Num 2)), Var "z")) 
-                    = ((Letrec ("z", (Binop (Plus, Num 42, Num 2)), Var "z"))))
-               "subst let rec z = z + 2 in z with z = 42";
-     unit_test (subst "z" 
-                         (Num 42)
-                         (Letrec ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) 
-                    = ((Letrec ("y", (Binop (Plus, Num 42, Num 2)), Num 42))))
-               "subst let rec y = z + 2 in z with z = 42";
+     unit_test (subst "z" (Binop (Plus, Var "y", Num 1)) 
+               (Letrec ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) = 
+               (Letrec ("y", (Binop (Plus, (Binop (Plus, Var "y", Num 1)), Num 2)), 
+               (Binop (Plus, Var "y", Num 1)))))
+               "subst let rec y = z + 2 in z with z = y + 1  --redo";
+
+     unit_test (subst "z" (Num 42) (Letrec ("y", (Binop (Plus, Var "z", Num 2)), 
+          Var "z")) = ((Letrec ("y", (Binop (Plus, Num 42, Num 2)), Num 42)))) 
+          "subst let rec y = z + 2 in z with z = 42";
+
      unit_test (subst "z" 
                          (Binop (Plus, Var "y", Num 1))
                          (Letrec ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) 
@@ -198,7 +211,7 @@ let subst_test () =
      
      unit_test (subst "z" (Float 3.14) (Float 3.14) = (Float 3.14))
                     "subst float 3.14 with 3.14";
-                    
+
      unit_test (subst "y" (Float 2.71) (Var "x") = (Var "x"))
           "subst float 2.71 in variable x, no substitution";
 
@@ -223,3 +236,4 @@ let subst_test () =
 
 let _ = freevars_test () ;;
 let _ = subst_test () ;;
+

@@ -42,6 +42,7 @@
                        ("+.", FPLUS);
                        ("-.", FMINUS);
                        ("*.", FTIMES);
+                       ("/.", FDIVIDE);
                        ("**", POWER);
                        ("^", CONCAT);  
                        ("(", OPEN);

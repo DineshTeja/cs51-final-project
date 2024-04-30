@@ -18,7 +18,7 @@
 %token <string> STRING
 %token TRUE FALSE
 %token FPLUS FMINUS
-%token FTIMES
+%token FTIMES FDIVIDE
 %token POWER
 %token CONCAT
 %token LBRACKET RBRACKET APPEND_LST CONS
@@ -67,6 +67,7 @@ expnoapp: INT                   { Num $1 }
         | exp FPLUS exp         { Binop(Fplus, $1, $3) }
         | exp FMINUS exp        { Binop(Fminus, $1, $3) }
         | exp FTIMES exp        { Binop(Ftimes, $1, $3) }
+        | exp FDIVIDE exp { Binop(Fdivide, $1, $3) }
         | exp POWER exp         { Binop(Power, $1, $3) }
         | NEG exp               { Unop(Negate, $2) }
         | IF exp THEN exp ELSE exp      { Conditional($2, $4, $6) }
