@@ -1,17 +1,7 @@
-(*
-                         CS 51 Final Project
-                           MiniML -- Parser
-
-   This grammar is processed by menhir. See
-   http://gallium.inria.fr/~fpottier/menhir/manual.html and
-   https://dev.realworldocaml.org/parsing-with-ocamllex-and-menhir.html
-   for documentation of the various declarations used here.  *)
-                  
 %{
   open Expr ;;
 %}
 
-(* Tokens *)
 %token EOF
 %token OPEN CLOSE
 %token LET DOT IN REC
@@ -24,30 +14,48 @@
 %token RAISE
 %token <string> ID
 %token <int> INT 
+%token <float> FLOAT
+%token <string> STRING
 %token TRUE FALSE
+%token FPLUS FMINUS
+%token FTIMES
+%token POWER
+%token CONCAT
+%token LBRACKET RBRACKET APPEND_LST CONS
+%token SEMICOLON
 
-(* Associativity and precedence *)
 %nonassoc IF
 %left LESSTHAN EQUALS
 %left PLUS MINUS
 %left TIMES
+%left FPLUS FMINUS
+%left FTIMES
+%right POWER
+%left CONCAT
 %nonassoc NEG
 
-(* Start symbol of the grammar and its type *)
 %start input
 %type <Expr.expr> input
 
-(* Grammar rules with actions to build an `expr` value as defined in
-   the `Expr` module. *)
 %%
 input:  exp EOF                 { $1 }
 
-(* expressions *)
+expr_list:
+    exp SEMICOLON expr_list { $1 :: $3 }
+  | exp                     { [$1] }
+
+list: 
+    LBRACKET expr_list RBRACKET { List $2 }
+
 exp:    exp expnoapp            { App($1, $2) }
         | expnoapp              { $1 }
-
-(* expressions except for application expressions *)
+        | list                    { $1 }
+        | exp CONS exp              { ListCons($1, $3) }
+        | exp APPEND_LST exp            { ListAppend($1, $3) } 
+          
 expnoapp: INT                   { Num $1 }
+        | FLOAT                 { Float $1 }
+        | STRING                { String $1 }
         | TRUE                  { Bool true }
         | FALSE                 { Bool false }
         | ID                    { Var $1 }
@@ -56,13 +64,18 @@ expnoapp: INT                   { Num $1 }
         | exp TIMES exp         { Binop(Times, $1, $3) }
         | exp EQUALS exp        { Binop(Equals, $1, $3) }
         | exp LESSTHAN exp      { Binop(LessThan, $1, $3) }
+        | exp FPLUS exp         { Binop(Fplus, $1, $3) }
+        | exp FMINUS exp        { Binop(Fminus, $1, $3) }
+        | exp FTIMES exp        { Binop(Ftimes, $1, $3) }
+        | exp POWER exp         { Binop(Power, $1, $3) }
         | NEG exp               { Unop(Negate, $2) }
         | IF exp THEN exp ELSE exp      { Conditional($2, $4, $6) }
+        | exp CONCAT exp                { Binop(Concat, $1, $3) }
+        | LBRACKET expr_list RBRACKET   { Expr.List $2 }
         | LET ID EQUALS exp IN exp      { Let($2, $4, $6) }
         | LET REC ID EQUALS exp IN exp  { Letrec($3, $5, $7) }
-        | FUNCTION ID DOT exp   { Fun($2, $4) } 
-        | RAISE                 { Raise }
-        | OPEN exp CLOSE        { $2 }
+        | FUNCTION ID DOT exp           { Fun($2, $4) } 
+        | RAISE                         { Raise }
+        | OPEN exp CLOSE                { $2 }
 ;
-
 %%

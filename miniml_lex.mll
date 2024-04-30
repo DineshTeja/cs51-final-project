@@ -39,21 +39,41 @@
                        ("+", PLUS);
                        ("-", MINUS);
                        ("*", TIMES);
+                       ("+.", FPLUS);
+                       ("-.", FMINUS);
+                       ("*.", FTIMES);
+                       ("**", POWER);
+                       ("^", CONCAT);  
                        ("(", OPEN);
-                       (")", CLOSE)
+                       (")", CLOSE);
+                       ("[", LBRACKET);
+                       ("]", RBRACKET);
+                       ("::", CONS);
+                       ("@", APPEND_LST);
+                       (";", SEMICOLON);
                      ]
 }
 
 let digit = ['0'-'9']
 let id = ['a'-'z'] ['a'-'z' '0'-'9']*
 let sym = ['(' ')'] | (['$' '&' '*' '+' '-' '/' '=' '<' '>' '^'
-                            '.' '~' ';' '!' '?' '%' ':' '#']+)
+                            '.' '~' ';' '!' '?' '%' ':' '#' ]+)
+
+let frac = '.' digit*
+let exp = ['e' 'E'] ['-' '+']? digit+
+let float = digit* frac? exp?
+let string = '"' ( [^ '"' '\\'] | '\\' (['"' '\\' 'n' 't']) )* '"'
 
 rule token = parse
   | digit+ as inum
         { let num = int_of_string inum in
           INT num
         }
+  | float as fnum 
+        { let num = float_of_string fnum in 
+          FLOAT num
+        }
+  | string as s { STRING (String.sub s 1 (String.length s - 2)) }
   | id as word
         { try
             let token = Hashtbl.find keyword_table word in
@@ -69,9 +89,12 @@ rule token = parse
             printf "Ignoring unrecognized token: %s\n" symbol;
             token lexbuf
         }
+  | '@' { APPEND_LST }  (* Explicit rule for list append operator *)
+  | '[' { LBRACKET }  (* Explicit rule for left bracket *)
+  | ']' { RBRACKET }  (* Explicit rule for right bracket *)
   | '{' [^ '\n']* '}'   { token lexbuf }    (* skip one-line comments *)
   | [' ' '\t' '\n']     { token lexbuf }    (* skip whitespace *)
-  | _ as c                                  (* warn & skip unrecognized chars *)
+  | _ as c                                  (* warn and skip unrecognized characters *)
         { printf "Ignoring unrecognized character: %c\n" c;
           token lexbuf
         }

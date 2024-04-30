@@ -19,6 +19,11 @@ type binop =
   | Times
   | Equals
   | LessThan
+  | Fplus
+  | Fminus
+  | Ftimes
+  | Power
+  | Concat
 ;;
 
 (* Variable identifers *)
@@ -29,6 +34,8 @@ type expr =
   | Var of varid                         (* variables *)
   | Num of int                           (* integers *)
   | Bool of bool                         (* booleans *)
+  | Float of float                       (* floats *)
+  | String of string                     (* strings *)
   | Unop of unop * expr                  (* unary operators *)
   | Binop of binop * expr * expr         (* binary operators *)
   | Conditional of expr * expr * expr    (* if then else *)
@@ -38,6 +45,9 @@ type expr =
   | Raise                                (* exceptions *)
   | Unassigned                           (* (temporarily) unassigned *)
   | App of expr * expr                   (* function applications *)
+  | List of expr list                   (* lists of expressions *)
+  | ListCons of expr * expr             (* cons operator to construct lists *)
+  | ListAppend of expr * expr             (* cons operator to construct lists *)
 ;;
     
 (*......................................................................
