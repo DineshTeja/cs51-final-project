@@ -44,14 +44,14 @@ expr_list:
     exp SEMICOLON expr_list { $1 :: $3 }
   | exp                     { [$1] }
 
-list: 
+src_miniml_parse_list: 
     LBRACKET expr_list RBRACKET { List $2 }
 
 exp:    exp expnoapp            { App($1, $2) }
         | expnoapp              { $1 }
-        | list                    { $1 }
-        | exp CONS exp              { ListCons($1, $3) }
-        | exp APPEND_LST exp            { ListAppend($1, $3) } 
+        | src_miniml_parse_list  { $1 }
+        | exp CONS exp          { ListCons($1, $3) }
+        | exp APPEND_LST exp    { ListAppend($1, $3) } 
           
 expnoapp: INT                   { Num $1 }
         | FLOAT                 { Float $1 }
@@ -67,16 +67,16 @@ expnoapp: INT                   { Num $1 }
         | exp FPLUS exp         { Binop(Fplus, $1, $3) }
         | exp FMINUS exp        { Binop(Fminus, $1, $3) }
         | exp FTIMES exp        { Binop(Ftimes, $1, $3) }
-        | exp FDIVIDE exp { Binop(Fdivide, $1, $3) }
+        | exp FDIVIDE exp       { Binop(Fdivide, $1, $3) }
         | exp POWER exp         { Binop(Power, $1, $3) }
         | NEG exp               { Unop(Negate, $2) }
         | IF exp THEN exp ELSE exp      { Conditional($2, $4, $6) }
         | exp CONCAT exp                { Binop(Concat, $1, $3) }
-        | LBRACKET expr_list RBRACKET   { Expr.List $2 }
         | LET ID EQUALS exp IN exp      { Let($2, $4, $6) }
         | LET REC ID EQUALS exp IN exp  { Letrec($3, $5, $7) }
         | FUNCTION ID DOT exp           { Fun($2, $4) } 
         | RAISE                         { Raise }
         | OPEN exp CLOSE                { $2 }
 ;
+
 %%
