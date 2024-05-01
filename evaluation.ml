@@ -150,8 +150,8 @@ let check_list_type (lst : expr list) : bool =
   match lst with
   | [] -> true
   | h :: t ->
-      let head_type = expr_type_of h in
-      List.for_all (fun x -> expr_type_of x = head_type) t ;;
+      let head_type = Expr.type_of_expr h in
+      List.for_all (fun x -> Expr.type_of_expr x = head_type) t ;;
 
 (* Helper to evaluate binary operations (used in eval_s, eval_d, eval_l *)
 let eval_binop (eval_fn : expr -> Env.env -> Env.value) 
@@ -170,6 +170,7 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
     | Divide -> if y = 0 then raise (EvalError "Division by zero") 
                  else Env.Val (Num (x / y))
     | Equals -> Env.Val (Bool (x = y))
+    | NotEquals -> Env.Val (Bool (x <> y))
     | LessThan -> Env.Val (Bool (x < y))
     | GreaterThan -> Env.Val (Bool (x > y))
     | _ -> raise (EvalError "unsupported operation on int"))
@@ -181,6 +182,7 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
     | Divide -> if y = 0.0 then raise (EvalError "Division by zero") 
                  else Env.Val (Float (x /. y))
     | Equals -> Env.Val (Bool (x = y))
+    | NotEquals -> Env.Val (Bool (x <> y))
     | LessThan -> Env.Val (Bool (x < y))
     | GreaterThan -> Env.Val (Bool (x > y))
     | Power -> Env.Val (Float (x ** y))
@@ -188,11 +190,13 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
   | (Env.Val Bool b1, Env.Val Bool b2) ->
     (match binop with
     | Equals -> Env.Val (Bool (b1 = b2))
+    | NotEquals -> Env.Val (Bool (b1 <> b2))
     | _ -> raise (EvalError "boolean operation on non-equality"))
   | (Env.Val String s1, Env.Val String s2) ->
     (match binop with
     | Concat -> Env.Val (String (s1 ^ s2))
     | Equals -> Env.Val (Bool (s1 = s2))
+    | NotEquals -> Env.Val (Bool (s1 <> s2))
     | LessThan -> Env.Val (Bool (s1 < s2))
     | GreaterThan -> Env.Val (Bool (s1 > s2))
     | _ -> raise (EvalError "string operation on non-concat"))
@@ -201,17 +205,20 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
         Env.Val (List (v1 :: l))
       else
         raise (EvalError "Type mismatch in ListCons: elements must be of the same type")
-  | (Env.Val (List l1), Env.Val (List l2)) when binop = ListAppend ->
-      if check_list_type (l1 @ l2) then
-        Env.Val (List (l1 @ l2))
-      else
-        raise (EvalError "Type mismatch in ListAppend: both lists must contain elements of the same type")
+  | (Env.Val (List l1), Env.Val (List l2)) ->
+      (match binop with
+      | Equals -> Env.Val (Bool (l1 = l2))
+      | NotEquals -> Env.Val (Bool (l1 <> l2))
+      | LessThan -> Env.Val (Bool (l1 < l2))
+      | GreaterThan -> Env.Val (Bool (l1 > l2))
+      | ListAppend -> 
+        if check_list_type l1 && check_list_type l2 then
+          Env.Val (List (l1 @ l2))
+        else
+          raise (EvalError "Type mismatch in ListAppend: both lists must contain elements of the same type")
+      | _ -> raise (EvalError "Unsupported operation on lists"))
   | (Env.Val v1, Env.Val (List [])) when binop = ListCons ->
       Env.Val (List [v1])  
-  | (Env.Val (List []), Env.Val (List l2)) when binop = ListAppend ->
-      Env.Val (List l2) 
-  | (Env.Val (List l1), Env.Val (List [])) when binop = ListAppend ->
-      Env.Val (List l1) 
   | _ -> raise (EvalError "binop on non-compatible types")
 ;;
 

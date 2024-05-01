@@ -8,7 +8,7 @@
 %token NEG
 %token PLUS MINUS 
 %token TIMES DIVIDE
-%token LESSTHAN EQUALS GREATERTHAN
+%token LESSTHAN EQUALS GREATERTHAN NOT_EQUALS
 %token IF THEN ELSE 
 %token FUNCTION
 %token RAISE
@@ -69,6 +69,7 @@ expnoapp: INT                   { Num $1 }
         | exp TIMES exp         { Binop(Times, $1, $3) }
         | exp DIVIDE exp        { Binop(Divide, $1, $3) }
         | exp EQUALS exp        { Binop(Equals, $1, $3) }
+        | exp NOT_EQUALS exp   { Binop(NotEquals, $1, $3) }
         | exp LESSTHAN exp      { Binop(LessThan, $1, $3) }
         | exp GREATERTHAN exp   { Binop(GreaterThan, $1, $3) }
         | exp FPLUS exp         { Binop(Plus, $1, $3) }

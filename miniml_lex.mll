@@ -31,6 +31,7 @@
   let sym_table = 
     create_hashtable 8 [
                        ("=", EQUALS);
+                       ("<>", NOT_EQUALS);
                        ("<", LESSTHAN);
                        (">", GREATERTHAN);
                        (".", DOT);

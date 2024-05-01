@@ -17,6 +17,7 @@ type binop =
   | Times
   | Divide
   | Equals
+  | NotEquals
   | LessThan
   | GreaterThan
   | Power
@@ -157,7 +158,7 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
   String representations of expressions
  *)
 
- let type_of_expr expr =
+ let type_of_expr (expr : expr) : string =
   match expr with
   | Num _ -> "Int"
   | Float _ -> "Float"
@@ -185,6 +186,7 @@ let rec exp_to_concrete_string (exp : expr) : string =
       | Minus -> if type1 = "Float" || type2 = "Float" then " -. " else " - "
       | Times -> if type1 = "Float" || type2 = "Float" then " *. " else " * "
       | Equals -> " = "
+      | NotEquals -> " <> "
       | LessThan -> " < "
       | GreaterThan -> " > "
       | Power -> " ** "
@@ -235,6 +237,8 @@ let rec exp_to_abstract_string (exp : expr) : string =
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Equals -> "Binop(Equals, " ^ exp_to_abstract_string expr1 ^ ", " 
                     ^ exp_to_abstract_string expr2 ^ ")"
+      | NotEquals -> "Binop(NotEquals, " ^ exp_to_abstract_string expr1 ^ ", " 
+                      ^ exp_to_abstract_string expr2 ^ ")"
       | LessThan -> "Binop(LessThan, " ^ exp_to_abstract_string expr1 ^ ", " 
                       ^ exp_to_abstract_string expr2 ^ ")"
       | GreaterThan -> "Binop(GreaterThan, " ^ exp_to_abstract_string expr1 ^ ", " 

@@ -1,20 +1,31 @@
 # CS51 Final Project (MiniML) Write-Up
 
 **Dinesh Vasireddy**
-***May 1, 2024***
+*May 1, 2024*
 
-I added **four extensions** to MiniML for my final project:
+
+**Hello CS51 TFs**👋
+
+I added **four extensions** to my MiniML implementation for the final project:
 * **Lexical** Environment Semantic Evaluator
-* **Float** Data Type
-* **String** Data Type (Including Concatentation)
-* **Lists** (Including Cons and Append Operations)
+* **Float** Data Type 
+* **String** Data Type
+* **Lists** with Type Safety
 
-## Lexical evaluation
-As detailed in the ReadMe, I introduced a Lexical Environment Semantic Evaluator (eval_l in evaluation.ml) that adheres to lexical environment scoping rules. Unlike dynamic scoping, lexical scoping uses the environment in place at the time functions are defined, not when they are called. This is crucial for supporting closures effectively, allowing functions to carry with them the environment of their definition.
+I also added a few minor functionality adjustments, such as adding greater than (>) and not equals (<>) comparison features for the appropriate data types. However, I wouldn't consider these extensions, but rather some helpful quality of life features. 
 
-This evaluator modifies the handling of function applications and variable bindings. For instance, when a function is defined, it captures the current environment in a closure, and this environment is used later when the function is called, regardless of the current scope at the call site.
-
-As I coded this lexical evaluator, I also decided to abstract out the common logic between environment semantics evaluators (dynamic and lexical)into a separate function called eval_env, which exhibited different behaviors based on the environment semantics type (which I specified using a separate algebraic data type). 
+ ## Lexical Evaluation
+ In the implementation of the Lexical Environment Semantic Evaluator (`eval_l` in `evaluation.ml`), I focused on adhering to the principles of lexical scoping, where the environment at the time of function definition is used during function calls, rather than the environment at the call site. This approach is essential for the correct handling of closures, ensuring that functions encapsulate and utilize the environment from their point of definition.
+ 
+ To achieve this, I modified the handling of function applications and variable bindings significantly. When a function is defined, it is now wrapped into a closure along with its defining environment. This closure is then used when the function is called, ensuring that the original environment is preserved and used for evaluation, regardless of the current execution context.
+ 
+ The core of this functionality is encapsulated in the `eval_env` function, which I designed to handle expressions based on the specified environment type—dynamic or lexical. For lexical scoping, the function captures and uses the environment at the point of function definition. This is facilitated by the `Env.close` method, which creates a closure from a function expression and its environment.
+ 
+ Furthermore, I introduced a type distinction (`envspec`) that allows `eval_env` to adjust its behavior based on whether dynamic or lexical scoping is required. In the case of lexical scoping (`Lexical`), when evaluating a function application, the environment stored within the closure is used. This ensures that the function operates with the variables and bindings that were available at the time of its definition, not at the time of its invocation.
+ 
+ This implementation not only supports higher-order functions but also enhances the modularity and predictability of code by adhering to the lexical scoping rules. It was crucial to ensure that all parts of the environment, including function definitions and variable bindings, are correctly managed and consistent across different parts of the program.
+ 
+ By abstracting the common logic for environment handling into `eval_env`, I was able to streamline the implementation of both dynamic and lexical evaluators, reducing redundancy and improving maintainability. This abstraction also simplifies the extension of the evaluator for additional features or optimizations in the future.
 
 ## Float data type
 ```
@@ -32,9 +43,20 @@ xx> evaluation error: int operation on float
 <== 2./.0.;;
 xx> evaluation error: Division by zero
 ```
-I also added the Float data type to MiniML, along with specific float operations (Fplus, Fminus, Ftimes, Fdivide). This was a relatively simple extension as it simply required an adaptation of the existing logic for integers for the simple binop operations. 
+In my extension of MiniML, I introduced the Float data type to handle floating-point arithmetic, which is crucial for applications requiring precision beyond integers. This addition involved several modifications across the system to ensure seamless integration and correct operation.
 
-This extension required modifications to the expr data type, the available binop operations, and the evaluators to handle operations involving floats correctly as shown above, specifically ensuring that the binop float operations correctly apply to floats and not integers. I also checked for the Division by Zero edge case and designed the extension such that an EvalError is thrown when that invalid operation occurs. 
+#### Expression Modifications
+In `expr.ml`, I expanded the `expr` type to include `Float of float`, allowing the representation of floating-point numbers directly in the syntax tree. This change required updates to the string representation functions to correctly display floats in both concrete and abstract syntax forms.
+
+#### Parser and Lexer Adjustments
+In `miniml_lex.mll`, I defined rules to recognize floating-point numbers, distinguishing them from integers. This involved handling optional fractional parts and exponents in the lexer. The lexer now correctly identifies and converts floating-point literals into the `FLOAT` token, which is passed to the parser.
+
+In `miniml_parse.mly`, I added parsing rules to handle the `FLOAT` token, ensuring that floating-point numbers are correctly parsed into the `Float` expression type. I also introduced floating-point specific binary operators (`FPLUS`, `FMINUS`, `FTIMES`, `FDIVIDE`) to handle arithmetic operations specific to floats.
+
+#### Evaluation Logic
+In `evaluation.ml`, I extended the evaluation functions to handle operations on floats. This included defining behavior for the new floating-point binary operators, ensuring that operations like addition, subtraction, multiplication, and division are performed correctly on floating-point numbers. Special care was taken to handle edge cases such as division by zero, which raises an `EvalError`. I also implemented error handling cases when float operations were executed on non-float data types or non-float operations were executed on a float data type to ensure type safety with float computation. 
+
+These modifications ensure that MiniML can now handle floating-point arithmetic accurately, enhancing the language's utility for a much broader range of computational operations.
 
 ## String data type
 ```
@@ -44,15 +66,33 @@ This extension required modifications to the expr data type, the available binop
 ==> String(hello world!)
 <== "hello" ^ 3 ;;
 xx> evaluation error: binop on non-compatible types
+<== "hello" = "hello";;
+==> Bool(true)
+<== "hello" <> "random";;
+==> Bool(true)
+<== "hello" < "new";;
+==> Bool(true)
+<== "hello" > "random";;
+==> Bool(false)
 ```
-Similar to the Float data type, I also added a String data type to MiniML. However, since Strings don't use similar binop operations to integers and floats, I went ahead and added the concatenating feature (^) as demonstrated above.
+To enhance MiniML's capabilities, I implemented the String data type, enabling the manipulation and comparison of text. This extension required updates across the parser, lexer, expression definitions, and evaluation logic.
 
-Handling strings required adjustments in both the parser miniml_parse.mlly (adding symbols for concatentation and quotation mark recognition for strings) and evaluation.ml, ensuring that string literals are correctly interpreted and that string-specific operations (only concatenation in this case) are correctly executed.
+#### Expression Modifications
+In `expr.ml`, I introduced `String of string` within the `expr` type to represent string literals directly in the syntax tree. This addition necessitated updates to functions handling string representations to ensure strings are correctly displayed in both concrete and abstract syntax forms.
+
+#### Parser and Lexer Adjustments
+In `miniml_lex.mll`, I defined rules to recognize and correctly tokenize string literals, encapsulated by quotation marks. This setup ensures that string values are accurately captured and passed to the parser as the `STRING` token.
+
+In `miniml_parse.mly`, I incorporated parsing rules for the `STRING` token, ensuring that string literals are parsed into the `String` expression type. Additionally, I introduced the `CONCAT` operator to handle string concatenation, represented by the `^` symbol in expressions.
+
+#### Evaluation Logic
+In `evaluation.ml`, I extended the evaluation functions to handle string-specific operations. The primary operation, string concatenation (`CONCAT`), involves checking that both operands are strings before concatenating them, raising an `EvalError` for type mismatches.
+
+#### Comparison Features
+To facilitate richer interactions with strings, I also implemented comparison operations for strings, such as `Equals`,`NotEquals`, `LessThan`, and `GreaterThan`. These operations allow for direct comparison between string literals, broadening MiniML's type system and also improving its applicability for constructing expressions involving string data.
 
 ## List data type
-I also extended MiniML by implementing the List data type, along with list manipulation operations like cons and appending. This was one of my more complex extensions as it required modifications of the expression syntax, evaluation logic, and parsing mechanisms. 
-
-In the expr.ml file, I expanded the expr type to include new constructors: List for representing lists of expressions, ListCons for the cons operation (prepending an element to a list), and ListAppend for concatenating two lists. In evaluation.ml, I adapted the evaluators to handle these new list operations. The evaluator for List evaluates each expression in the list, collecting the results. For ListCons, it ensures the second expression evaluates to a list before prepending the evaluated first expression, and for ListAppend, it concatenates two evaluated lists if both expressions evaluate to lists.
+For my final project, I extended MiniML by implementing the List data type, which involved comprehensive modifications across the parser, lexer, expression definitions, and evaluation logic to support list operations effectively.
 
 ```
 <== [1;2;3];;
@@ -61,6 +101,37 @@ In the expr.ml file, I expanded the expr type to include new constructors: List 
 ==> List(Num(1), Num(2), Num(3))
 <== [1;2;3] @ [4;5];;
 ==> List(Num(1), Num(2), Num(3), Num(4), Num(5))
+<== [];;
+==> List()
+<== 1 :: [];;
+==> List(Num(1))
+<== [] @ [1;2;3];;
+==> List(Num(1), Num(2), Num(3))
 ```
 
-Furthermore, I modified miniml_parse.mly to include parsing rules for these list operations, recognizing new syntax such as brackets for list literals and handling tokens for list operations (CONS (::) and APPEND_LST(@)). In miniml_lex.mll, I defined these tokens and adjusted the lexer to recognize list-related syntax, ensuring that list operations are correctly tokenized during lexical analysis. 
+#### Expression Modifications
+In `expr.ml`, I introduced a new constructor `List of expr list` to the `expr` type to represent lists of expressions. This addition required updates to functions handling string representations to ensure lists are correctly displayed in both concrete and abstract syntax forms.
+
+#### Parser and Lexer Adjustments
+In `miniml_lex.mll`, I defined tokens for list-specific syntax such as brackets (`[`, `]`) and list operations (`::` for cons and `@` for append). This setup ensures that list structures and operations are accurately recognized and tokenized.
+
+In `miniml_parse.mly`, I incorporated parsing rules for these tokens, ensuring that list literals and operations are parsed into the appropriate `expr` types. This includes handling empty lists and the use of list-specific operations within expressions.
+
+#### Evaluation Logic
+In `evaluation.ml`, I extended the evaluation functions to handle list-specific operations. This includes evaluating each expression within a list, handling the `ListCons` operation to prepend an element, and the `ListAppend` operation to concatenate two lists. I implemented type checks to ensure all elements within a list are of the same type, enhancing type safety.
+
+#### Type Inference and Safety
+I introduced a function `check_list_type` that verifies all elements in a list share the same type and ensures type consistency within lists by throwing an `EvalError` when list definitions have conflicting types. This function is used during list creation and operations to prevent type errors.
+
+#### Handling of Empty Lists
+Special handling for empty lists was added to ensure operations like concatenation and cons behave correctly when applied to or with empty lists. This includes returning the non-empty list during concatenation if one of the lists is empty.
+
+#### List Comparison
+I also ensured that the list implementation supported comparison operations (`Equals`, `NotEquals`, `LessThan`, `GreaterThan`) to allow list structures to be compared lexicographically, similar to strings (as it works in OCaml). This feature could be useful for conditional expressions and assertions within MiniML programs.
+
+These enhancements not only broaden MiniML's type system but also improve its applicability for data manipulation and functional programming patterns involving lists.
+
+## Final Thoughts
+Overall, I had a great experience with this MiniML project. I feel like I got a much better understanding of a lot of different semantics rules and I found it exciting to have the ability to implement nuances of a programming language by hand. I also feel that all of my extensions really add another layer of usability to MiniML and feel that they really expand the scope of the project in a way that I found meaningful. 
+
+**Thank you all for making CS51 a great course✌️!**
