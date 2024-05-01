@@ -127,6 +127,31 @@ let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
 
+type expr_type =
+| TInt
+| TBool
+| TFloat
+| TString
+| TList
+| TFunc
+| TOther
+
+let expr_type_of (exp : expr) : expr_type =
+  match exp with
+  | Num _ -> TInt
+  | Bool _ -> TBool
+  | Float _ -> TFloat
+  | String _ -> TString
+  | List _ -> TList
+  | Fun _ -> TFunc
+  | _ -> TOther
+  
+let check_list_type (lst : expr list) : bool =
+  match lst with
+  | [] -> true
+  | h :: t ->
+      let head_type = expr_type_of h in
+      List.for_all (fun x -> expr_type_of x = head_type) t ;;
 
 (* Helper to evaluate binary operations (used in eval_s, eval_d, eval_l *)
 let eval_binop (eval_fn : expr -> Env.env -> Env.value) 
@@ -142,20 +167,24 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
     | Plus -> Env.Val (Num (x + y))
     | Minus -> Env.Val (Num (x - y))
     | Times -> Env.Val (Num (x * y))
+    | Divide -> if y = 0 then raise (EvalError "Division by zero") 
+                 else Env.Val (Num (x / y))
     | Equals -> Env.Val (Bool (x = y))
     | LessThan -> Env.Val (Bool (x < y))
-    | _ -> raise (EvalError "float operation on int"))
+    | GreaterThan -> Env.Val (Bool (x > y))
+    | _ -> raise (EvalError "unsupported operation on int"))
   | (Env.Val Float x, Env.Val Float y) ->
     (match binop with
-    | Fplus -> Env.Val (Float (x +. y))
-    | Fminus -> Env.Val (Float (x -. y))
-    | Ftimes -> Env.Val (Float (x *. y))
-    | Fdivide -> if y = 0.0 then raise (EvalError "Division by zero") 
+    | Plus -> Env.Val (Float (x +. y))
+    | Minus -> Env.Val (Float (x -. y))
+    | Times -> Env.Val (Float (x *. y))
+    | Divide -> if y = 0.0 then raise (EvalError "Division by zero") 
                  else Env.Val (Float (x /. y))
     | Equals -> Env.Val (Bool (x = y))
     | LessThan -> Env.Val (Bool (x < y))
+    | GreaterThan -> Env.Val (Bool (x > y))
     | Power -> Env.Val (Float (x ** y))
-    | _ -> raise (EvalError "int operation on float"))
+    | _ -> raise (EvalError "unsupported operation on float"))
   | (Env.Val Bool b1, Env.Val Bool b2) ->
     (match binop with
     | Equals -> Env.Val (Bool (b1 = b2))
@@ -163,9 +192,28 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
   | (Env.Val String s1, Env.Val String s2) ->
     (match binop with
     | Concat -> Env.Val (String (s1 ^ s2))
+    | Equals -> Env.Val (Bool (s1 = s2))
+    | LessThan -> Env.Val (Bool (s1 < s2))
+    | GreaterThan -> Env.Val (Bool (s1 > s2))
     | _ -> raise (EvalError "string operation on non-concat"))
+  | (Env.Val v1, Env.Val (List l)) when binop = ListCons ->
+      if check_list_type (v1 :: l) then
+        Env.Val (List (v1 :: l))
+      else
+        raise (EvalError "Type mismatch in ListCons: elements must be of the same type")
+  | (Env.Val (List l1), Env.Val (List l2)) when binop = ListAppend ->
+      if check_list_type (l1 @ l2) then
+        Env.Val (List (l1 @ l2))
+      else
+        raise (EvalError "Type mismatch in ListAppend: both lists must contain elements of the same type")
+  | (Env.Val v1, Env.Val (List [])) when binop = ListCons ->
+      Env.Val (List [v1])  
+  | (Env.Val (List []), Env.Val (List l2)) when binop = ListAppend ->
+      Env.Val (List l2) 
+  | (Env.Val (List l1), Env.Val (List [])) when binop = ListAppend ->
+      Env.Val (List l1) 
   | _ -> raise (EvalError "binop on non-compatible types")
-
+;;
 
 (* The SUBSTITUTION MODEL evaluator -- to be completed *)
 let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
@@ -187,20 +235,14 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
       | Env.Val Bool b -> if b then eval_s expr2 _env else eval_s expr3 _env 
       | _ -> raise (EvalError "non-boolean in conditional"))
   (* -------------LIST EXTENSION--------------- *)
-  | List exprs -> 
-    Env.Val (List (List.map (fun e -> match eval_s e _env with
-                                      | Env.Val v -> v
-                                      | _ -> raise (EvalError 
-                                            "Invalid list expression")) exprs))
-  | ListCons (e1, e2) ->
-    (match eval_s e1 _env, eval_s e2 _env with
-     | Env.Val v1, Env.Val (List l) -> Env.Val (List (v1 :: l))
-     | _, Env.Val (List _) -> raise (EvalError "Invalid head in ListCons")
-     | _, _ -> raise (EvalError "Invalid tail in ListCons, must be a list"))
-  | ListAppend (e1, e2) ->
-      (match eval_s e1 _env, eval_s e2 _env with
-      | Env.Val (List l1), Env.Val (List l2) -> Env.Val (List (l1 @ l2))
-      | _ -> raise (EvalError "Invalid operands for ListAppend"))
+  | List exprs ->
+    let evaluated_list = List.map (fun e -> match eval_s e _env with
+                                            | Env.Val v -> v
+                                            | _ -> raise (EvalError "Invalid list expression")) exprs in
+    if check_list_type evaluated_list then
+      Env.Val (List evaluated_list)
+    else
+      raise (EvalError "Type mismatch: all elements in the list must be of the same type")
   (* ----------------------------------------- *)
   | Let (x, expr1, expr2) -> eval_s (subst x (extract_expr expr1) expr2) _env
   | Letrec (x, expr1, expr2) -> 
@@ -250,19 +292,14 @@ let rec eval_env (exp : expr)
                           else eval_env expr3 env env_type
       | _ -> raise (EvalError "non-boolean in conditional"))
   (* ---LIST EXTENSION--------------- *)
-  | List exprs -> 
-    Env.Val (List (List.map (fun e -> match eval_env e env env_type with
-                                      | Env.Val v -> v
-                                      | _ -> raise (EvalError 
-                                             "Invalid list expression")) exprs))
-  | ListCons (e1, e2) ->
-      (match eval_env e1 env env_type, eval_env e2 env env_type with
-      | Env.Val v1, Env.Val (List l) -> Env.Val (List (v1 :: l))
-      | _ -> raise (EvalError "Invalid operands for ListCons"))
-  | ListAppend (e1, e2) ->
-    (match eval_env e1 env env_type, eval_env e2 env env_type with
-      | Env.Val (List l1), Env.Val (List l2) -> Env.Val (List (l1 @ l2))
-      | _ -> raise (EvalError "Both operands must be lists for ListAppend"))
+  | List exprs ->
+    let evaluated_list = List.map (fun e -> match eval_env e env env_type with
+                                            | Env.Val v -> v
+                                            | _ -> raise (EvalError "Invalid list expression")) exprs in
+    if check_list_type evaluated_list then
+      Env.Val (List evaluated_list)
+    else
+      raise (EvalError "Type mismatch: all elements in the list must be of the same type")
   (*-----------------------------------*)
   | Let (x, expr1, expr2) -> 
       eval_env expr2 (Env.extend env x (ref (eval_env expr1 env env_type))) 
@@ -319,4 +356,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_l ;;
+let evaluate = eval_s ;;

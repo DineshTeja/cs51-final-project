@@ -84,20 +84,20 @@ let freevars_test () =
      unit_test (same_vars set_a_b (free_vars (List [Var "a"; Var "b"; Num 10])))
                "free_vars list with variables a and b";
 
-     unit_test (same_vars set_a (free_vars (ListCons (Var "a", List []))))
+     unit_test (same_vars set_a (free_vars (Binop (ListCons, Var "a", List []))))
                "free_vars list cons with a and empty list";
-     unit_test (same_vars set_a_b (free_vars (ListCons (Var "a", List [Var "b"]))))
+     unit_test (same_vars set_a_b (free_vars (Binop (ListCons, Var "a", List [Var "b"]))))
                "free_vars list cons with a and list containing b";
-     unit_test (same_vars set_a_b_c (free_vars (ListCons (Var "a", ListCons (Var "b", Var "c")))))
+     unit_test (same_vars set_a_b_c (free_vars (Binop (ListCons, Var "a", Binop (ListCons, Var "b", Var "c")))))
                "free_vars list cons with a, b cons c";
-
-     unit_test (same_vars empty_set (free_vars (ListAppend (List [], List []))))
+     
+     unit_test (same_vars empty_set (free_vars (Binop (ListAppend, List [], List []))))
                "free_vars list append of two empty lists";
-     unit_test (same_vars set_a (free_vars (ListAppend (List [Var "a"], List []))))
+     unit_test (same_vars set_a (free_vars (Binop (ListAppend, List [Var "a"], List []))))
                "free_vars list append of list with a and empty list";
-     unit_test (same_vars set_a_b (free_vars (ListAppend (List [Var "a"], List [Var "b"]))))
+     unit_test (same_vars set_a_b (free_vars (Binop (ListAppend, List [Var "a"], List [Var "b"]))))
                "free_vars list append of list with a and list with b";
-     unit_test (same_vars set_a_b_c (free_vars (ListAppend (List [Var "a"; Var "b"], List [Var "c"]))))
+     unit_test (same_vars set_a_b_c (free_vars (Binop (ListAppend, List [Var "a"; Var "b"], List [Var "c"]))))
                "free_vars list append of list with a, b and list with c";
 ;;
 
@@ -213,10 +213,10 @@ let subst_test () =
 
      unit_test (subst "z" (Num 42) (List [Var "z"; Num 1; Var "z"]) = (List [Num 42; Num 1; Num 42]))
                     "subst list [z; 1; z] with z = 42";
-     unit_test (subst "z" (Num 42) (ListCons (Var "z", List [Num 1; Var "z"])) = (ListCons (Num 42, List [Num 1; Num 42])))
-                    "subst list cons z :: [1; z] with z = 42";
-     unit_test (subst "z" (Num 42) (ListAppend (List [Var "z"], List [Num 1; Var "z"])) = (ListAppend (List [Num 42], List [Num 1; Num 42])))
-                    "subst list append [z] @ [1; z] with z = 42";
+     unit_test (subst "z" (Num 42) (Binop (ListCons, Var "z", List [Num 1; Var "z"])) = (Binop (ListCons, Num 42, List [Num 1; Num 42])))
+               "subst list cons z :: [1; z] with z = 42";
+     unit_test (subst "z" (Num 42) (Binop (ListAppend, List [Var "z"], List [Num 1; Var "z"])) = (Binop (ListAppend, List [Num 42], List [Num 1; Num 42])))
+               "subst list append [z] @ [1; z] with z = 42";
 ;;     
 
 let _ = freevars_test () ;;

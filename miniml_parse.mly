@@ -7,8 +7,8 @@
 %token LET DOT IN REC
 %token NEG
 %token PLUS MINUS 
-%token TIMES
-%token LESSTHAN EQUALS
+%token TIMES DIVIDE
+%token LESSTHAN EQUALS GREATERTHAN
 %token IF THEN ELSE 
 %token FUNCTION
 %token RAISE
@@ -36,6 +36,10 @@
 
 %start input
 %type <Expr.expr> input
+%type <Expr.expr> exp
+%type <Expr.expr> expnoapp
+%type <Expr.expr list> expr_list
+%type <Expr.expr> src_miniml_parse_list
 
 %%
 input:  exp EOF                 { $1 }
@@ -46,12 +50,13 @@ expr_list:
 
 src_miniml_parse_list: 
     LBRACKET expr_list RBRACKET { List $2 }
+    | LBRACKET RBRACKET           { List [] }
 
 exp:    exp expnoapp            { App($1, $2) }
         | expnoapp              { $1 }
-        | src_miniml_parse_list  { $1 }
-        | exp CONS exp          { ListCons($1, $3) }
-        | exp APPEND_LST exp    { ListAppend($1, $3) } 
+        | src_miniml_parse_list { $1 }
+        | exp CONS exp          { Binop(ListCons, $1, $3) }  
+        | exp APPEND_LST exp    { Binop(ListAppend, $1, $3) }
           
 expnoapp: INT                   { Num $1 }
         | FLOAT                 { Float $1 }
@@ -62,12 +67,14 @@ expnoapp: INT                   { Num $1 }
         | exp PLUS exp          { Binop(Plus, $1, $3) }
         | exp MINUS exp         { Binop(Minus, $1, $3) }
         | exp TIMES exp         { Binop(Times, $1, $3) }
+        | exp DIVIDE exp        { Binop(Divide, $1, $3) }
         | exp EQUALS exp        { Binop(Equals, $1, $3) }
         | exp LESSTHAN exp      { Binop(LessThan, $1, $3) }
-        | exp FPLUS exp         { Binop(Fplus, $1, $3) }
-        | exp FMINUS exp        { Binop(Fminus, $1, $3) }
-        | exp FTIMES exp        { Binop(Ftimes, $1, $3) }
-        | exp FDIVIDE exp       { Binop(Fdivide, $1, $3) }
+        | exp GREATERTHAN exp   { Binop(GreaterThan, $1, $3) }
+        | exp FPLUS exp         { Binop(Plus, $1, $3) }
+        | exp FMINUS exp        { Binop(Minus, $1, $3) }
+        | exp FTIMES exp        { Binop(Times, $1, $3) }
+        | exp FDIVIDE exp       { Binop(Divide, $1, $3) }
         | exp POWER exp         { Binop(Power, $1, $3) }
         | NEG exp               { Unop(Negate, $2) }
         | IF exp THEN exp ELSE exp      { Conditional($2, $4, $6) }

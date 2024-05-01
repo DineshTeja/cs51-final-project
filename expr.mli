@@ -17,14 +17,14 @@ type binop =
   | Plus
   | Minus
   | Times
+  | Divide
   | Equals
   | LessThan
-  | Fplus
-  | Fminus
-  | Ftimes
-  | Fdivide
+  | GreaterThan
   | Power
   | Concat
+  | ListCons
+  | ListAppend
 ;;
 
 (* Variable identifers *)
@@ -47,8 +47,6 @@ type expr =
   | Unassigned                           (* (temporarily) unassigned *)
   | App of expr * expr                   (* function applications *)
   | List of expr list                   (* lists of expressions *)
-  | ListCons of expr * expr             (* cons operator to construct lists *)
-  | ListAppend of expr * expr             (* cons operator to construct lists *)
 ;;
     
 (*......................................................................

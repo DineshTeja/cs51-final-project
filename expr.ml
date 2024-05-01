@@ -15,14 +15,14 @@ type binop =
   | Plus
   | Minus
   | Times
+  | Divide
   | Equals
   | LessThan
-  | Fplus
-  | Fminus
-  | Ftimes
-  | Fdivide
+  | GreaterThan
   | Power
   | Concat
+  | ListCons
+  | ListAppend
 ;;
 
 type varid = string ;;
@@ -43,8 +43,6 @@ type expr =
   | Unassigned                           (* (temporarily) unassigned *)
   | App of expr * expr                   (* function applications *)
   | List of expr list                   (* lists of expressions *)
-  | ListCons of expr * expr             (* cons operator to construct lists *)
-  | ListAppend of expr * expr           (* operator to append list to list *)
 ;;
   
 (*......................................................................
@@ -87,8 +85,6 @@ let rec free_vars (exp : expr) : varidset =
     remove x (union (free_vars expr1) (free_vars expr2))
   | App (expr1, expr2) -> (free_vars expr1) |> union (free_vars expr2) 
   | List exprs -> List.fold_left (fun acc exp -> SS.union acc (free_vars exp)) SS.empty exprs
-  | ListCons (e1, e2) -> SS.union (free_vars e1) (free_vars e2)
-  | ListAppend (e1, e2) -> SS.union (free_vars e1) (free_vars e2)
   ;;
   
 (* new_varname () -- Returns a freshly minted `varid` with prefix
@@ -155,13 +151,19 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
   | App (expr1, expr2) -> App (subst var_name repl expr1, 
 															 subst var_name repl expr2) 
   | List exprs -> List (List.map (subst var_name repl) exprs)
-  | ListCons (e1, e2) -> ListCons (subst var_name repl e1, subst var_name repl e2)
-  | ListAppend (e1, e2) -> ListAppend (subst var_name repl e1, subst var_name repl e2)
 ;;
 
 (*......................................................................
   String representations of expressions
  *)
+
+ let type_of_expr expr =
+  match expr with
+  | Num _ -> "Int"
+  | Float _ -> "Float"
+  | Bool _ -> "Bool"
+  | String _ -> "String"
+  | _ -> "Other"
    
 (* exp_to_concrete_string exp -- Returns a string representation of
    the concrete syntax of the expression `exp` *)
@@ -176,18 +178,22 @@ let rec exp_to_concrete_string (exp : expr) : string =
     (match unop with 
       | Negate -> "-" ^ exp_to_concrete_string expr)
   | Binop (binop, expr1, expr2) -> 
-    (match binop with 
-      | Plus -> exp_to_concrete_string expr1 ^ " + " ^ exp_to_concrete_string expr2
-      | Minus -> exp_to_concrete_string expr1 ^ " - " ^ exp_to_concrete_string expr2
-      | Times -> exp_to_concrete_string expr1 ^ " * " ^ exp_to_concrete_string expr2
-      | Equals -> exp_to_concrete_string expr1 ^ " = " ^ exp_to_concrete_string expr2
-      | LessThan -> exp_to_concrete_string expr1 ^ " < " ^ exp_to_concrete_string expr2
-      | Fplus -> exp_to_concrete_string expr1 ^ " +. " ^ exp_to_concrete_string expr2
-      | Fminus -> exp_to_concrete_string expr1 ^ " -. " ^ exp_to_concrete_string expr2
-      | Ftimes -> exp_to_concrete_string expr1 ^ " *. " ^ exp_to_concrete_string expr2
-      | Fdivide -> exp_to_concrete_string expr1 ^ " /. " ^ exp_to_concrete_string expr2
-      | Power -> exp_to_concrete_string expr1 ^ " ** " ^ exp_to_concrete_string expr2
-      | Concat -> exp_to_concrete_string expr1 ^ " ^ " ^ exp_to_concrete_string expr2)
+    let type1 = type_of_expr expr1 in
+    let type2 = type_of_expr expr2 in
+    let operator = match binop with
+      | Plus -> if type1 = "Float" || type2 = "Float" then " +. " else " + "
+      | Minus -> if type1 = "Float" || type2 = "Float" then " -. " else " - "
+      | Times -> if type1 = "Float" || type2 = "Float" then " *. " else " * "
+      | Equals -> " = "
+      | LessThan -> " < "
+      | GreaterThan -> " > "
+      | Power -> " ** "
+      | Concat -> " ^ "
+      | ListCons -> " :: "
+      | ListAppend -> " @ "
+      | _ -> failwith "Unsupported operation for concrete string representation"
+    in
+    exp_to_concrete_string expr1 ^ operator ^ exp_to_concrete_string expr2
   | Conditional (expr1, expr2, expr3) -> 
     "if " ^ exp_to_concrete_string expr1 ^ " then " ^ exp_to_concrete_string expr2
       ^ " else " ^ exp_to_concrete_string expr3 
@@ -203,11 +209,6 @@ let rec exp_to_concrete_string (exp : expr) : string =
   | App (expr1, expr2) -> 
     exp_to_concrete_string expr1 ^ " " ^ exp_to_concrete_string expr2
   | List exprs -> "[" ^ String.concat "; " (List.map exp_to_concrete_string exprs) ^ "]"
-  | ListCons (e1, e2) ->
-    (match e2 with
-    | List elems -> "[" ^ exp_to_concrete_string e1 ^ "; " ^ String.concat "; " (List.map exp_to_concrete_string elems) ^ "]"
-    | _ -> exp_to_concrete_string e1 ^ " :: " ^ exp_to_concrete_string e2)
-  | ListAppend (e1, e2) -> exp_to_concrete_string e1 ^ " @ " ^ exp_to_concrete_string e2
 ;;
 
 (* exp_to_abstract_string exp -- Return a string representation of the
@@ -223,29 +224,29 @@ let rec exp_to_abstract_string (exp : expr) : string =
     (match unop with 
       | Negate -> "Unop(Negate, " ^ exp_to_abstract_string expr ^ ")")
   | Binop (binop, expr1, expr2) -> 
-    (match binop with 
+    (match binop with
       | Plus -> "Binop(Plus, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Minus -> "Binop(Minus, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Times -> "Binop(Times, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
+      | Divide -> "Binop(Divide, " ^ exp_to_abstract_string expr1 ^ ", " 
+                  ^ exp_to_abstract_string expr2 ^ ")"
       | Equals -> "Binop(Equals, " ^ exp_to_abstract_string expr1 ^ ", " 
                     ^ exp_to_abstract_string expr2 ^ ")"
       | LessThan -> "Binop(LessThan, " ^ exp_to_abstract_string expr1 ^ ", " 
                       ^ exp_to_abstract_string expr2 ^ ")"
-      | Fplus -> "Binop(Fplus, " ^ exp_to_abstract_string expr1 ^ ", " 
-                  ^ exp_to_abstract_string expr2 ^ ")"
-      | Fminus -> "Binop(Fminus, " ^ exp_to_abstract_string expr1 ^ ", " 
-                  ^ exp_to_abstract_string expr2 ^ ")"
-      | Ftimes -> "Binop(Ftimes, e" ^ exp_to_abstract_string expr1 ^ ", " 
-                  ^ exp_to_abstract_string expr2 ^ ")"
-      | Fdivide -> "Binop(Fdivide, " ^ exp_to_abstract_string expr1 ^ ", " 
-                  ^ exp_to_abstract_string expr2 ^ ")"
+      | GreaterThan -> "Binop(GreaterThan, " ^ exp_to_abstract_string expr1 ^ ", " 
+                      ^ exp_to_abstract_string expr2 ^ ")"
       | Power -> "Binop(Power, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Concat -> "Binop(Concat, " ^ exp_to_abstract_string expr1 ^ ", " 
-                  ^ exp_to_abstract_string expr2 ^ ")")
+                  ^ exp_to_abstract_string expr2 ^ ")"
+      | ListCons -> "Binop(ListCons," ^ exp_to_abstract_string expr1 ^ ", " 
+                      ^ exp_to_abstract_string expr2 ^ ")"
+      | ListAppend -> "Binop(ListAppend," ^ exp_to_abstract_string expr1 ^ ", " 
+                      ^ exp_to_abstract_string expr2 ^ ")")
   | Conditional (expr1, expr2, expr3) -> 
     "Conditional(" ^ exp_to_abstract_string expr1 ^ ", " 
       ^ exp_to_abstract_string expr2 ^ ", " ^ exp_to_abstract_string expr3 ^ ")" 
@@ -261,12 +262,4 @@ let rec exp_to_abstract_string (exp : expr) : string =
   | App (expr1, expr2) -> 
     "App(" ^ exp_to_abstract_string expr1 ^ ", " ^ exp_to_abstract_string expr2 ^ ")"
   | List exprs -> "List(" ^ String.concat ", " (List.map exp_to_abstract_string exprs) ^ ")"
-  | ListCons (e1, e2) ->
-    "ListCons(" ^ exp_to_abstract_string e1 ^ ", " ^ exp_to_abstract_string e2 ^ ")"
-  | ListAppend (e1, e2) -> 
-    let list_to_string lst = 
-      match lst with
-      | List elems -> String.concat ", " (List.map exp_to_abstract_string elems)
-      | _ -> exp_to_abstract_string lst in
-    "List(" ^ list_to_string e1 ^ ", " ^ list_to_string e2 ^ ")"
 ;;

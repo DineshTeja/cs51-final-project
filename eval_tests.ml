@@ -67,34 +67,58 @@ let eval_s_test () =
   unit_test (eval_s (Binop (LessThan, Num 3, Num 5)) empty 
                    = value (Bool true))
              "eval_s 3 < 5";
-  unit_test (eval_s (Binop (Fplus, Float 3.5, Float 2.5)) empty 
+
+  unit_test (eval_s (Binop (GreaterThan, Num 10, Num 5)) empty 
+                    = value (Bool true))
+            "eval_s 10 > 5";
+  unit_test (eval_s (Binop (GreaterThan, Float 5.5, Float 2.2)) empty 
+                    = value (Bool true))
+            "eval_s 5.5 > 2.2";
+  unit_test (eval_s (Binop (Plus, Float 3.5, Float 2.5)) empty 
                    = value (Float 6.0))
              "eval_s 3.5 +. 2.5";
-  unit_test (eval_s (Binop (Fminus, Float 3.5, Float 1.5)) empty 
+  unit_test (eval_s (Binop (Minus, Float 3.5, Float 1.5)) empty 
                    = value (Float 2.0))
              "eval_s 3.5 -. 1.5";
-  unit_test (eval_s (Binop (Ftimes, Float 2.0, Float 3.0)) empty 
+  unit_test (eval_s (Binop (Times, Float 2.0, Float 3.0)) empty 
                    = value (Float 6.0))
              "eval_s 2.0 *. 3.0";
-  unit_test (eval_s (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+  unit_test (eval_s (Binop (Divide, Float 6.0, Float 3.0)) empty 
                    = value (Float 2.0))
              "eval_s 6.0 /. 3.0";
   unit_test (eval_s (Binop (Concat, String "hello ", String "world")) empty 
                    = value (String "hello world"))
              "eval_s 'hello ' ^ 'world'";
+
+  unit_test (eval_s (Binop (GreaterThan, String "banana", String "apple")) empty 
+             = value (Bool true))
+      "eval_s 'banana' > 'apple'";
+  
+  unit_test (eval_s (Binop (LessThan, String "hello", String "hello")) empty 
+                    = value (Bool false))
+      "eval_s 'hello' < 'hello'";
+
+  unit_test (eval_s (Binop (LessThan, String "hello", String "new")) empty 
+                  = value (Bool true))
+    "eval_s 'hello' < 'new'";
+
   unit_test (eval_s (List [Num 1; Num 2; Num 3]) empty 
                    = value (List [Num 1; Num 2; Num 3]))
              "eval_s [1; 2; 3]";
-  unit_test (eval_s (ListCons (Num 0, List [Num 1; Num 2])) empty 
+
+  unit_test (eval_s (Binop (ListCons, Num 0, List [Num 1; Num 2])) empty 
                    = value (List [Num 0; Num 1; Num 2]))
              "eval_s 0 :: [1; 2]";
-  unit_test (eval_s (ListAppend (List [Num 1; Num 2], 
+
+  unit_test (eval_s (Binop (ListAppend, List [Num 1; Num 2], 
                                  List [Num 3; Num 4])) empty 
                    = value (List [Num 1; Num 2; Num 3; Num 4]))
              "eval_s [1; 2] @ [3; 4]";
+
   unit_test (eval_s (Let ("z", (Binop (Plus, Num 20, Num 22)), Var "z")) empty
                    = value (Num 42))
              "eval_s let z = 20 + 22 in z";
+
   unit_test (eval_s (Letrec 
                       ("f", 
                        Fun ("x", Conditional (Binop(Equals, 
@@ -151,23 +175,31 @@ let eval_d_test () =
               = value (Bool true))
         "eval_d 7 = 7";     
 
+  unit_test (eval_d (Binop (GreaterThan, Num 10, Num 5)) empty 
+                    = value (Bool true))
+            "eval_d 10 > 5";
+
+  unit_test (eval_d (Binop (GreaterThan, Float 5.5, Float 2.2)) empty 
+                    = value (Bool true))
+            "eval_d 5.5 > 2.2";
+
   unit_test (eval_d (Binop (LessThan, Num 7, Num 10)) empty 
               = value (Bool true))
         "eval_d 7 < 10";
 
-  unit_test (eval_d (Binop (Fplus, Float 3.0, Float 4.5)) empty 
+  unit_test (eval_d (Binop (Plus, Float 3.0, Float 4.5)) empty 
               = value (Float 7.5))
         "eval_d 3.0 +. 4.5";
 
-  unit_test (eval_d (Binop (Fminus, Float 10.0, Float 4.5)) empty 
+  unit_test (eval_d (Binop (Minus, Float 10.0, Float 4.5)) empty 
               = value (Float 5.5))
         "eval_d 10.0 -. 4.5";
 
-  unit_test (eval_d (Binop (Ftimes, Float 4.0, Float 3.0)) empty 
+  unit_test (eval_d (Binop (Times, Float 4.0, Float 3.0)) empty 
               = value (Float 12.0))
         "eval_d 4.0 *. 3.0";
   
-  unit_test (eval_d (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+  unit_test (eval_d (Binop (Divide, Float 6.0, Float 3.0)) empty 
               = value (Float 2.0))
         "eval_d 6.0 /. 3.0";
 
@@ -224,15 +256,27 @@ let eval_d_test () =
             = value (String "hello world"))
             "eval_d 'hello ' ^ 'world' in s -> 'hello '";
 
+  unit_test (eval_d (Binop (GreaterThan, String "banana", String "apple")) empty 
+            = value (Bool true))
+    "eval_d 'banana' > 'apple'";
+  
+  unit_test (eval_d (Binop (LessThan, String "hello", String "hello")) empty 
+                    = value (Bool false))
+      "eval_d 'hello' < 'hello'";
+
+  unit_test (eval_d (Binop (LessThan, String "hello", String "new")) empty 
+                  = value (Bool true))
+    "eval_d 'hello' < 'new'";
+
   unit_test (eval_d (List [Num 1; Num 2; Num 3]) empty 
             = value (List [Num 1; Num 2; Num 3]))
             "eval_d [1; 2; 3]";
 
-  unit_test (eval_d (ListCons (Num 0, List [Num 1; Num 2])) empty 
+  unit_test (eval_d (Binop (ListCons, Num 0, List [Num 1; Num 2])) empty 
             = value (List [Num 0; Num 1; Num 2]))
             "eval_d 0 :: [1; 2]";
 
-  unit_test (eval_d (ListAppend (List [Num 1; Num 2], 
+  unit_test (eval_d (Binop (ListAppend, List [Num 1; Num 2], 
                                  List [Num 3; Num 4])) empty 
             = value (List [Num 1; Num 2; Num 3; Num 4]))
             "eval_d [1; 2] @ [3; 4]";
@@ -281,9 +325,7 @@ let eval_l_test () =
   unit_test (eval_l (Var "x") env_num10 = value (Num 10))
             "eval_l x in x -> 10"; 
 
-
-
-            unit_test (eval_l (Unop (Negate, Binop (Plus, Num 3, Num 4))) empty 
+  unit_test (eval_l (Unop (Negate, Binop (Plus, Num 3, Num 4))) empty 
             = value (Num ~-7))
        "eval_l - (3 + 4)"; 
 
@@ -298,20 +340,28 @@ let eval_l_test () =
         "eval_l 3 * 5";
   unit_test (eval_l (Binop (Equals, Num 7, Num 3)) env_num10 
               = value (Bool false))
-        "eval_l 7 = 3";     
+        "eval_l 7 = 3";   
+        
+  unit_test (eval_l (Binop (GreaterThan, Num 10, Num 5)) empty 
+                    = value (Bool true))
+            "eval_l 10 > 5";
+  unit_test (eval_l (Binop (GreaterThan, Float 5.5, Float 2.2)) empty 
+                    = value (Bool true))
+            "eval_l 5.5 > 2.2";
+
   unit_test (eval_l (Binop (LessThan, Num 3, Num 5)) empty 
               = value (Bool true))
         "eval_l 3 < 5";
-  unit_test (eval_l (Binop (Fplus, Float 3.0, Float 4.5)) empty 
+  unit_test (eval_l (Binop (Plus, Float 3.0, Float 4.5)) empty 
               = value (Float 7.5))
         "eval_l 3.0 +. 4.5";
-  unit_test (eval_l (Binop (Fminus, Float 6.0, Float 3.5)) empty 
+  unit_test (eval_l (Binop (Minus, Float 6.0, Float 3.5)) empty 
               = value (Float 2.5))
         "eval_l 6.0 -. 3.5";
-  unit_test (eval_l (Binop (Ftimes, Float 5.0, Float 2.5)) empty 
+  unit_test (eval_l (Binop (Times, Float 5.0, Float 2.5)) empty 
               = value (Float 12.5))
         "eval_l 5.0 *. 2.5";
-  unit_test (eval_d (Binop (Fdivide, Float 6.0, Float 3.0)) empty 
+  unit_test (eval_d (Binop (Divide, Float 6.0, Float 3.0)) empty 
         = value (Float 2.0))
         "eval_d 6.0 /. 3.0";
   unit_test (eval_l (Binop (Equals, Float 5.0, Float 5.0)) empty 
@@ -359,15 +409,28 @@ let eval_l_test () =
             = value (String "hello world"))
             "eval_l 'hello ' ^ 'world' in s -> 'hello '";
 
+
+ unit_test (eval_l (Binop (GreaterThan, String "banana", String "apple")) empty 
+            = value (Bool true))
+            "eval_l 'banana' > 'apple'";
+ 
+ unit_test (eval_l (Binop (LessThan, String "hello", String "hello")) empty 
+                    = value (Bool false))
+      "eval_l 'hello' < 'hello'";
+
+ unit_test (eval_l (Binop (LessThan, String "hello", String "new")) empty 
+                  = value (Bool true))
+    "eval_l 'hello' < 'new'";
+   
   unit_test (eval_l (List [Num 1; Num 2; Num 3]) empty 
             = value (List [Num 1; Num 2; Num 3]))
             "eval_l [1; 2; 3]";
 
-  unit_test (eval_l (ListCons (Num 0, List [Num 1; Num 2])) empty 
+  unit_test (eval_l (Binop (ListCons, Num 0, List [Num 1; Num 2])) empty 
             = value (List [Num 0; Num 1; Num 2]))
             "eval_l 0 :: [1; 2]";
 
-  unit_test (eval_l (ListAppend (List [Num 1; Num 2], List [Num 3; Num 4])) empty 
+  unit_test (eval_l (Binop (ListAppend, List [Num 1; Num 2], List [Num 3; Num 4])) empty 
             = value (List [Num 1; Num 2; Num 3; Num 4]))
             "eval_l [1; 2] @ [3; 4]";
 

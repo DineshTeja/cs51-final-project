@@ -32,6 +32,7 @@
     create_hashtable 8 [
                        ("=", EQUALS);
                        ("<", LESSTHAN);
+                       (">", GREATERTHAN);
                        (".", DOT);
                        ("->", DOT);
                        (";;", EOF);
@@ -39,6 +40,7 @@
                        ("+", PLUS);
                        ("-", MINUS);
                        ("*", TIMES);
+                       ("/", DIVIDE);
                        ("+.", FPLUS);
                        ("-.", FMINUS);
                        ("*.", FTIMES);

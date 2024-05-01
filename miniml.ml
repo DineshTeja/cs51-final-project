@@ -28,7 +28,7 @@ let repl () =
 
   (* the main LOOP *)
   while true do
-    (try
+      (try
         (* prompt *)
         printf "<== %!";
         
