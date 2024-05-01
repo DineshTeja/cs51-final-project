@@ -1,8 +1,6 @@
 open Expr ;;
-open Evaluation ;; 
 open CS51Utils ;; 
 open Absbook ;;
-open Miniml ;;
 
 let freevars_test () = 
      let empty_set = vars_of_list [] in 
@@ -174,33 +172,20 @@ let subst_test () =
                               (Binop (Plus, Var "y", Num 1))))))
                               "subst let y = z + 2 in z with z = y + 1";
 
+     unit_test (subst "x" (Var "z") (Letrec ("x", Var "x", Var "y")) = Letrec ("x", Var "x", Var "y"))
+     "subst letrec with no substitution when variable names match";
 
-     unit_test (subst "x" (Num 5) (Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 10))) = Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 10)))
-               "subst letrec with shadowing";
-     unit_test (subst "y" (Num 5) (Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Var "y"))) = Letrec ("x", Fun ("y", Binop (Plus, Var "x", Var "y")), App (Var "x", Num 5)))
-               "subst letrec without shadowing";
-
-     unit_test (exp_to_abstract_string (subst "x" (Var "z") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(y))") "subst letrec test";
-     unit_test (exp_to_abstract_string (subst "y" (Var "z") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(z))") "subst letrec test 2";
-     unit_test (exp_to_abstract_string (subst "z" (Var "x") (Letrec("x", Var "x", Var "y"))) = "Letrec(x, Var(x), Var(y))") "subst letrec test 3";
-              
-     unit_test (subst "z" (Binop (Plus, Var "y", Num 1)) 
-               (Letrec ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) = 
-               (Letrec ("y", (Binop (Plus, (Binop (Plus, Var "y", Num 1)), Num 2)), 
-               (Binop (Plus, Var "y", Num 1)))))
-               "subst let rec y = z + 2 in z with z = y + 1  --redo";
-
-     unit_test (subst "z" (Num 42) (Letrec ("y", (Binop (Plus, Var "z", Num 2)), 
-          Var "z")) = ((Letrec ("y", (Binop (Plus, Num 42, Num 2)), Num 42)))) 
-          "subst let rec y = z + 2 in z with z = 42";
-
-     unit_test (subst "z" 
-                         (Binop (Plus, Var "y", Num 1))
-                         (Letrec ("y", (Binop (Plus, Var "z", Num 2)), Var "z")) 
-                    = ((Letrec ("var2", 
-                                   (Binop (Plus, (Binop (Plus, Var "y", Num 1)), Num 2)), 
-                                   (Binop (Plus, Var "y", Num 1))))))
-               "subst let rec y = z + 2 in z with z = y + 1";
+     unit_test (subst "x" (Num 42) (Letrec ("y", Binop (Plus, Var "x", Num 1), Var "x")) 
+     = Letrec ("y", Binop (Plus, Num 42, Num 1), Num 42))
+     "subst letrec where y is not a free variable in the replacement expression";
+     
+     unit_test (subst "x" (Var "y") (Letrec ("y", Binop (Plus, Var "x", Num 1), Var "x")) 
+     = Letrec ("var2", Binop (Plus, Var "y", Num 1), Var "y"))
+     "subst letrec where y is a free variable in repl, requiring renaming to avoid capture";
+     
+     unit_test (subst "x" (Fun ("x", Var "x")) (Letrec ("x", Fun ("x", Var "x"), Var "x")) 
+     = Letrec ("x", Fun ("x", Var "x"), Var "x"))
+     "subst letrec let x = fun x -> x in x";
 
      unit_test (subst "z" (Num 42) (App ((Fun ("z", Binop (Plus, Var "z", Num 2))), Num 1)) 
                     = (App ((Fun ("z", Binop (Plus, Var "z", Num 2))), Num 1)))

@@ -45,7 +45,7 @@ let eval_s_test () =
   
   unit_test (try 
               eval_s (Raise) empty = value (Raise)
-             with EvalError("error in evaluation") -> true)
+             with EvalException -> true)
              "eval_s Raise"; 
 
   unit_test (eval_s (Unop (Negate, Binop (Minus, Num 10, Num 3))) empty 
@@ -131,7 +131,7 @@ let eval_d_test () =
               with EvalError "variable not found in environment" -> true)
             "eval_d y"; 
 
-            unit_test (eval_d (Unop (Negate, Binop (Plus, Num 4, Num 6))) empty 
+  unit_test (eval_d (Unop (Negate, Binop (Plus, Num 4, Num 6))) empty 
             = value (Num ~-10))
        "eval_d - (4 + 6)"; 
 

@@ -129,30 +129,29 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
   | Fun (x, expr) -> 
     if x = var_name then exp 
     else if x <> var_name && x |> is_fv_of repl then
-      let new_var = new_varname () in
+      let new_var = if SS.mem x (free_vars repl) then new_varname () else x in
       Fun (new_var, subst var_name repl (subst x (Var new_var) expr))
     else 
       Fun (x, subst var_name repl expr)
   | Let (x, expr1, expr2) ->
 		if x = var_name then Let (x, subst var_name repl expr1, expr2)
 		else if x <> var_name && x |> is_fv_of repl then
-			let new_var = new_varname () in
+      let new_var = if SS.mem x (free_vars repl) then new_varname () else x in
 			Let (new_var, 
 					 subst var_name repl expr1, 
 					 subst var_name repl (subst x (Var new_var) expr2))
 		else 
 			Let (x, subst var_name repl expr1, subst var_name repl expr2)
-	| Letrec (x, expr1, expr2) -> 
-		(* if x = var_name then Letrec (x, subst var_name repl expr1, expr2) *)
-    if x = var_name then Letrec (x, expr1, expr2)
-		else if x <> var_name && x |> is_fv_of repl then
-			let new_var = new_varname () in
-			Letrec (new_var, 
-              (* subst var_name repl expr1,  *)
-              subst var_name repl (subst x (Var new_var) expr1),
-              subst var_name repl (subst x (Var new_var) expr2))
-		else 
-			Letrec (x, subst var_name repl expr1, subst var_name repl expr2)
+  | Letrec (x, expr1, expr2) -> 
+      if x = var_name then 
+          Letrec (x, expr1, expr2)
+      else if not (SS.mem x (free_vars repl)) then
+          Letrec (x, subst var_name repl expr1, subst var_name repl expr2)
+      else
+          let new_var = if SS.mem x (free_vars repl) then new_varname () else x in
+          Letrec (new_var, 
+                  subst var_name repl (subst x (Var new_var) expr1),
+                  subst var_name repl (subst x (Var new_var) expr2))
   | App (expr1, expr2) -> App (subst var_name repl expr1, 
 															 subst var_name repl expr2) 
   | List exprs -> List (List.map (subst var_name repl) exprs)
@@ -186,17 +185,12 @@ let rec exp_to_concrete_string (exp : expr) : string =
       | Fplus -> exp_to_concrete_string expr1 ^ " +. " ^ exp_to_concrete_string expr2
       | Fminus -> exp_to_concrete_string expr1 ^ " -. " ^ exp_to_concrete_string expr2
       | Ftimes -> exp_to_concrete_string expr1 ^ " *. " ^ exp_to_concrete_string expr2
+      | Fdivide -> exp_to_concrete_string expr1 ^ " /. " ^ exp_to_concrete_string expr2
       | Power -> exp_to_concrete_string expr1 ^ " ** " ^ exp_to_concrete_string expr2
       | Concat -> exp_to_concrete_string expr1 ^ " ^ " ^ exp_to_concrete_string expr2)
   | Conditional (expr1, expr2, expr3) -> 
     "if " ^ exp_to_concrete_string expr1 ^ " then " ^ exp_to_concrete_string expr2
       ^ " else " ^ exp_to_concrete_string expr3 
-  | List exprs -> "[" ^ String.concat "; " (List.map exp_to_concrete_string exprs) ^ "]"
-  | ListCons (e1, e2) ->
-    match e2 with
-    | List elems -> "[" ^ exp_to_concrete_string e1 ^ "; " ^ String.concat "; " (List.map exp_to_concrete_string elems) ^ "]"
-    | _ -> exp_to_concrete_string e1 ^ " :: " ^ exp_to_concrete_string e2
-  | ListAppend (e1, e2) -> exp_to_concrete_string e1 ^ " @ " ^ exp_to_concrete_string e2
   | Fun (x, expr) -> "fun " ^ x ^ " -> " ^ exp_to_concrete_string expr    
   | Let (x, expr1, expr2) -> 
     "let " ^ x ^ " = " ^ exp_to_concrete_string expr1 ^ " in " 
@@ -208,6 +202,12 @@ let rec exp_to_concrete_string (exp : expr) : string =
   | Unassigned -> "unassigned"
   | App (expr1, expr2) -> 
     exp_to_concrete_string expr1 ^ " " ^ exp_to_concrete_string expr2
+  | List exprs -> "[" ^ String.concat "; " (List.map exp_to_concrete_string exprs) ^ "]"
+  | ListCons (e1, e2) ->
+    (match e2 with
+    | List elems -> "[" ^ exp_to_concrete_string e1 ^ "; " ^ String.concat "; " (List.map exp_to_concrete_string elems) ^ "]"
+    | _ -> exp_to_concrete_string e1 ^ " :: " ^ exp_to_concrete_string e2)
+  | ListAppend (e1, e2) -> exp_to_concrete_string e1 ^ " @ " ^ exp_to_concrete_string e2
 ;;
 
 (* exp_to_abstract_string exp -- Return a string representation of the
@@ -240,6 +240,8 @@ let rec exp_to_abstract_string (exp : expr) : string =
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Ftimes -> "Binop(Ftimes, e" ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
+      | Fdivide -> "Binop(Fdivide, " ^ exp_to_abstract_string expr1 ^ ", " 
+                  ^ exp_to_abstract_string expr2 ^ ")"
       | Power -> "Binop(Power, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
       | Concat -> "Binop(Concat, " ^ exp_to_abstract_string expr1 ^ ", " 
@@ -247,15 +249,6 @@ let rec exp_to_abstract_string (exp : expr) : string =
   | Conditional (expr1, expr2, expr3) -> 
     "Conditional(" ^ exp_to_abstract_string expr1 ^ ", " 
       ^ exp_to_abstract_string expr2 ^ ", " ^ exp_to_abstract_string expr3 ^ ")" 
-  | List exprs -> "List(" ^ String.concat ", " (List.map exp_to_abstract_string exprs) ^ ")"
-  | ListCons (e1, e2) ->
-    "ListCons(" ^ exp_to_abstract_string e1 ^ ", " ^ exp_to_abstract_string e2 ^ ")"
-  | ListAppend (e1, e2) -> 
-    let list_to_string lst = 
-      match lst with
-      | List elems -> String.concat ", " (List.map exp_to_abstract_string elems)
-      | _ -> exp_to_abstract_string lst in
-    "List(" ^ list_to_string e1 ^ ", " ^ list_to_string e2 ^ ")"
   | Fun (x, expr) -> "Fun(" ^ x ^ ", " ^ exp_to_abstract_string expr ^ ")"    
   | Let (x, expr1, expr2) -> 
     "Let(" ^ x ^ ", " ^ exp_to_abstract_string expr1 ^ ", " 
@@ -267,4 +260,13 @@ let rec exp_to_abstract_string (exp : expr) : string =
   | Unassigned -> "Unassigned"
   | App (expr1, expr2) -> 
     "App(" ^ exp_to_abstract_string expr1 ^ ", " ^ exp_to_abstract_string expr2 ^ ")"
+  | List exprs -> "List(" ^ String.concat ", " (List.map exp_to_abstract_string exprs) ^ ")"
+  | ListCons (e1, e2) ->
+    "ListCons(" ^ exp_to_abstract_string e1 ^ ", " ^ exp_to_abstract_string e2 ^ ")"
+  | ListAppend (e1, e2) -> 
+    let list_to_string lst = 
+      match lst with
+      | List elems -> String.concat ", " (List.map exp_to_abstract_string elems)
+      | _ -> exp_to_abstract_string lst in
+    "List(" ^ list_to_string e1 ^ ", " ^ list_to_string e2 ^ ")"
 ;;

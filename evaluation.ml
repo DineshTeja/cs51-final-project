@@ -156,6 +156,10 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
     | LessThan -> Env.Val (Bool (x < y))
     | Power -> Env.Val (Float (x ** y))
     | _ -> raise (EvalError "int operation on float"))
+  | (Env.Val Bool b1, Env.Val Bool b2) ->
+    (match binop with
+    | Equals -> Env.Val (Bool (b1 = b2))
+    | _ -> raise (EvalError "boolean operation on non-equality"))
   | (Env.Val String s1, Env.Val String s2) ->
     (match binop with
     | Concat -> Env.Val (String (s1 ^ s2))
@@ -173,7 +177,7 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
   match exp with 
   | Num _ | Bool _ | Fun _ | Float _ | String _ -> Env.Val exp 
   | Var _ -> raise (EvalError "evaluation of unbound variable")  
-  | Raise -> raise (EvalError "error in evaluation")                
+  | Raise -> raise EvalException                
   | Unop (_, expr) -> (match extract_expr expr with 
                          | Num x -> Env.Val (Num (~- x))            
                          | _ -> raise (EvalError "unop on non-integer"))
@@ -231,7 +235,7 @@ let rec eval_env (exp : expr)
     (match env_type with 
     | Dynamic -> Env.Val exp
     | Lexical -> Env.close exp env)
-  | Raise -> raise (EvalError "error in evaluation")                
+  | Raise -> raise EvalException                
   | Var x -> Env.lookup env x               
   | Unop (_, expr) -> (match extract_expr expr env env_type with 
                          | Num x -> Env.Val (Num (~- x))
