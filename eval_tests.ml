@@ -12,7 +12,7 @@ let env_str = Env.extend (Env.empty ()) "s" (ref (value (String "hello ")));;
 
 let env_test () =
   unit_test (Env.close (Fun ("x", Binop (Plus, Var "x", Num 10))) env_num10 
-              = Closure (Fun ("x", Binop (Plus, Var "x", Num 10)), env_num10))
+              = Env.Closure (Fun ("x", Binop (Plus, Var "x", Num 10)), env_num10))
              "close [{x -> 10}, fun x -> x + 10]";
 
   unit_test (Env.lookup env_num10 "x" = Env.Val (Num 10))
