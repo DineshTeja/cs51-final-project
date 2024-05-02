@@ -267,7 +267,7 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
   | App (expr1, expr2) -> 
       match eval_s expr1 _env  with 
       | Env.Val Fun (x, b) -> eval_s (subst x (extract_expr expr2) b) _env
-      | _ -> raise (EvalError "function application on non-function");;
+      | _ -> raise (EvalError "function application on non-function") ;;
 
 
 type envspec = | Dynamic | Lexical ;;
