@@ -272,7 +272,7 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
 
 type envspec = | Dynamic | Lexical ;;
 
-(* Environment evaluators: use eval_envir helper *)
+(* Environment evaluators: eval_env helper is used for dynamic and lexical *)
 let rec eval_env (exp : expr) 
                    (env : Env.env) 
                    (env_type : envspec) 
