@@ -72,8 +72,6 @@ val free_vars : expr -> varidset ;;
 (* new_varname () -- Returns a freshly minted `varid` *)
 val new_varname : unit -> varid ;;
 
-val type_of_expr : expr -> string ;;
-
 (*......................................................................
   Substitution 
 

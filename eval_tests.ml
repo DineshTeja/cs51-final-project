@@ -12,7 +12,8 @@ let env_str = Env.extend (Env.empty ()) "s" (ref (value (String "hello ")));;
 
 let env_test () =
   unit_test (Env.close (Fun ("x", Binop (Plus, Var "x", Num 10))) env_num10 
-              = Env.Closure (Fun ("x", Binop (Plus, Var "x", Num 10)), env_num10))
+              = Env.Closure (Fun ("x", Binop (Plus, 
+                                              Var "x", Num 10)), env_num10))
              "close [{x -> 10}, fun x -> x + 10]";
 
   unit_test (Env.lookup env_num10 "x" = Env.Val (Num 10))
@@ -114,6 +115,22 @@ let eval_s_test () =
                                  List [Num 3; Num 4])) empty 
                    = value (List [Num 1; Num 2; Num 3; Num 4]))
              "eval_s [1; 2] @ [3; 4]";
+
+  unit_test (eval_s (List []) empty 
+                   = value (List []))
+             "eval_s []";
+
+  unit_test (eval_s (Binop (ListCons, Num 0, List [])) empty 
+                   = value (List [Num 0]))
+             "eval_s 0 :: []";
+
+  unit_test (eval_s (Binop (ListAppend, List [], List [Num 1; Num 2])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_s [] @ [1; 2]";
+
+  unit_test (eval_s (Binop (ListAppend, List [Num 1; Num 2], List [])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_s [1; 2] @ []";
 
   unit_test (eval_s (Let ("z", (Binop (Plus, Num 20, Num 22)), Var "z")) empty
                    = value (Num 42))
@@ -281,6 +298,22 @@ let eval_d_test () =
             = value (List [Num 1; Num 2; Num 3; Num 4]))
             "eval_d [1; 2] @ [3; 4]";
 
+  unit_test (eval_d (List []) empty 
+                   = value (List []))
+             "eval_d []";
+
+  unit_test (eval_d (Binop (ListCons, Num 0, List [])) empty 
+                   = value (List [Num 0]))
+             "eval_d 0 :: []";
+
+  unit_test (eval_d (Binop (ListAppend, List [], List [Num 1; Num 2])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_d [] @ [1; 2]";
+
+  unit_test (eval_d (Binop (ListAppend, List [Num 1; Num 2], List [])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_d [1; 2] @ []";
+
   unit_test (eval_d (Let ("z", (Binop (Plus, Num 20, Num 22)), Var "z")) empty
             = value (Num 42))
             "eval_d let z = 20 + 22 in z";
@@ -409,18 +442,17 @@ let eval_l_test () =
             = value (String "hello world"))
             "eval_l 'hello ' ^ 'world' in s -> 'hello '";
 
+  unit_test (eval_l (Binop (GreaterThan, String "banana", String "apple")) empty 
+              = value (Bool true))
+              "eval_l 'banana' > 'apple'";
+  
+  unit_test (eval_l (Binop (LessThan, String "hello", String "hello")) empty 
+                      = value (Bool false))
+        "eval_l 'hello' < 'hello'";
 
- unit_test (eval_l (Binop (GreaterThan, String "banana", String "apple")) empty 
-            = value (Bool true))
-            "eval_l 'banana' > 'apple'";
- 
- unit_test (eval_l (Binop (LessThan, String "hello", String "hello")) empty 
-                    = value (Bool false))
-      "eval_l 'hello' < 'hello'";
-
- unit_test (eval_l (Binop (LessThan, String "hello", String "new")) empty 
-                  = value (Bool true))
-    "eval_l 'hello' < 'new'";
+  unit_test (eval_l (Binop (LessThan, String "hello", String "new")) empty 
+                    = value (Bool true))
+      "eval_l 'hello' < 'new'";
    
   unit_test (eval_l (List [Num 1; Num 2; Num 3]) empty 
             = value (List [Num 1; Num 2; Num 3]))
@@ -430,9 +462,26 @@ let eval_l_test () =
             = value (List [Num 0; Num 1; Num 2]))
             "eval_l 0 :: [1; 2]";
 
-  unit_test (eval_l (Binop (ListAppend, List [Num 1; Num 2], List [Num 3; Num 4])) empty 
+  unit_test (eval_l (Binop (ListAppend, List [Num 1; Num 2], 
+                                        List [Num 3; Num 4])) empty 
             = value (List [Num 1; Num 2; Num 3; Num 4]))
             "eval_l [1; 2] @ [3; 4]";
+
+  unit_test (eval_l (Binop (ListCons, Num 0, List [])) empty 
+                   = value (List [Num 0]))
+             "eval_l 0 :: []";
+
+  unit_test (eval_l (Binop (ListAppend, List [], List [Num 1; Num 2])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_l [] @ [1; 2]";
+
+  unit_test (eval_l (Binop (ListAppend, List [Num 1; Num 2], List [])) empty 
+                   = value (List [Num 1; Num 2]))
+             "eval_l [1; 2] @ []";  
+    
+  unit_test (eval_l (List []) empty 
+             = value (List []))
+             "eval_l []";
 
   unit_test (eval_l (Let ("z", (Binop (Plus, Num 20, Num 22)), Var "z")) empty
             = value (Num 42))
@@ -457,6 +506,7 @@ let eval_l_test () =
                                                 Num 2)), Var "x")) env_num10
               = value (Num 7))
           "eval_l let rec x = 5 + 2 in x with x -> 10";
+
   unit_test (eval_l (Letrec 
                   ("f", 
                   Fun ("x", Conditional (Binop(Equals, 

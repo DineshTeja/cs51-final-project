@@ -80,11 +80,13 @@ module Env : ENV =
       (varname, loc) :: (List.remove_assoc varname env)
 
     let rec env_to_string (env : env) : string =
+      let sorted_env = List.sort (fun (x, _) (y, _) -> 
+                                    String.compare x y) env in
       let var_to_vals = 
         List.fold_left (fun acc (x, val_ref) -> 
                           acc ^ (x ^ "↦" ^ (value_to_string !val_ref)) ^ "; ")
                         ""
-                        env in
+                        sorted_env in
       "{" ^ var_to_vals ^ "}"
 
     and value_to_string ?(printenvp : bool = true) (v : value) : string =
@@ -126,32 +128,27 @@ module Env : ENV =
 let eval_t (exp : expr) (_env : Env.env) : Env.value =
   (* coerce the expr, unchanged, into a value *)
   Env.Val exp ;;
-
-type expr_type =
-| TInt
-| TBool
-| TFloat
-| TString
-| TList
-| TFunc
-| TOther
-
-let expr_type_of (exp : expr) : expr_type =
-  match exp with
-  | Num _ -> TInt
-  | Bool _ -> TBool
-  | Float _ -> TFloat
-  | String _ -> TString
-  | List _ -> TList
-  | Fun _ -> TFunc
-  | _ -> TOther
   
+(* Helper to check if two expressions are of the same type *)  
+let are_compatible_types (e1 : expr) (e2 : expr) : bool =
+  match (e1, e2) with
+  | (Num _, Num _) | (Bool _, Bool _) | (Float _, Float _)
+  | (String _, String _) | (List _, List _) | (Fun _, Fun _) -> true
+  | _ -> false
+;;
+
+(* Helper to check if all elements in a list are of the same type *)  
 let check_list_type (lst : expr list) : bool =
   match lst with
   | [] -> true
   | h :: t ->
-      let head_type = Expr.type_of_expr h in
-      List.for_all (fun x -> Expr.type_of_expr x = head_type) t ;;
+      let rec is_same_type head_type = function
+        | [] -> true
+        | x :: xs -> are_compatible_types head_type x && 
+                     is_same_type head_type xs
+      in
+      is_same_type h t
+;;
 
 (* Helper to evaluate binary operations (used in eval_s, eval_d, eval_l *)
 let eval_binop (eval_fn : expr -> Env.env -> Env.value) 
@@ -201,10 +198,11 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
     | GreaterThan -> Env.Val (Bool (s1 > s2))
     | _ -> raise (EvalError "string operation on non-concat"))
   | (Env.Val v1, Env.Val (List l)) when binop = ListCons ->
-      if check_list_type (v1 :: l) then
+      if List.for_all (are_compatible_types v1) l then
         Env.Val (List (v1 :: l))
       else
-        raise (EvalError "Type mismatch in ListCons: elements must be of the same type")
+        raise (EvalError 
+                "Type mismatch in ListCons: elements must be of the same type")
   | (Env.Val (List l1), Env.Val (List l2)) ->
       (match binop with
       | Equals -> Env.Val (Bool (l1 = l2))
@@ -212,10 +210,12 @@ let eval_binop (eval_fn : expr -> Env.env -> Env.value)
       | LessThan -> Env.Val (Bool (l1 < l2))
       | GreaterThan -> Env.Val (Bool (l1 > l2))
       | ListAppend -> 
-        if check_list_type l1 && check_list_type l2 then
+        if check_list_type l1 && check_list_type l2 && (l1 = [] || l2 = [] 
+                       || are_compatible_types (List.hd l1) (List.hd l2)) then
           Env.Val (List (l1 @ l2))
         else
-          raise (EvalError "Type mismatch in ListAppend: both lists must contain elements of the same type")
+          raise (EvalError 
+          "Type mismatch in ListAppend: lists must have same type elements")
       | _ -> raise (EvalError "Unsupported operation on lists"))
   | (Env.Val v1, Env.Val (List [])) when binop = ListCons ->
       Env.Val (List [v1])  
@@ -243,13 +243,17 @@ let rec eval_s (exp : expr) (_env : Env.env) : Env.value =
       | _ -> raise (EvalError "non-boolean in conditional"))
   (* -------------LIST EXTENSION--------------- *)
   | List exprs ->
-    let evaluated_list = List.map (fun e -> match eval_s e _env with
-                                            | Env.Val v -> v
-                                            | _ -> raise (EvalError "Invalid list expression")) exprs in
+    let evaluated_list = List.map (fun e -> 
+                                      match eval_s e _env with
+                                      | Env.Val v -> v
+                                      | _ -> raise 
+                                      (EvalError "Invalid list expression")) 
+                                                                    exprs in
     if check_list_type evaluated_list then
       Env.Val (List evaluated_list)
     else
-      raise (EvalError "Type mismatch: all elements in the list must be of the same type")
+      raise 
+      (EvalError "Type mismatch: all elements in the list must have same type")
   (* ----------------------------------------- *)
   | Let (x, expr1, expr2) -> eval_s (subst x (extract_expr expr1) expr2) _env
   | Letrec (x, expr1, expr2) -> 
@@ -300,13 +304,17 @@ let rec eval_env (exp : expr)
       | _ -> raise (EvalError "non-boolean in conditional"))
   (* ---LIST EXTENSION--------------- *)
   | List exprs ->
-    let evaluated_list = List.map (fun e -> match eval_env e env env_type with
-                                            | Env.Val v -> v
-                                            | _ -> raise (EvalError "Invalid list expression")) exprs in
+    let evaluated_list = List.map (fun e -> 
+                                    match eval_env e env env_type with
+                                    | Env.Val v -> v
+                                    | _ -> raise 
+                                          (EvalError "Invalid list expression")) 
+                                                                        exprs in
     if check_list_type evaluated_list then
       Env.Val (List evaluated_list)
     else
-      raise (EvalError "Type mismatch: all elements in the list must be of the same type")
+      raise 
+      (EvalError "Type mismatch: all elements in the list must have same type")
   (*-----------------------------------*)
   | Let (x, expr1, expr2) -> 
       eval_env expr2 (Env.extend env x (ref (eval_env expr1 env env_type))) 
@@ -363,4 +371,4 @@ let eval_e _ =
    above, not the `evaluate` function, so it doesn't matter how it's
    set when you submit your solution.) *)
    
-let evaluate = eval_s ;;
+let evaluate = eval_d ;;

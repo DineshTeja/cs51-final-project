@@ -78,15 +78,16 @@ let rec free_vars (exp : expr) : varidset =
   | Unop (_, expr) -> free_vars expr
   | Binop (_, expr1, expr2) -> union (free_vars expr1) (free_vars expr2)
   | Conditional (expr1, expr2, expr3) -> 
-    (free_vars expr1) |> union (free_vars expr2) |> union (free_vars expr3)
+      (free_vars expr1) |> union (free_vars expr2) |> union (free_vars expr3)
   | Fun (x, expr) -> remove x (free_vars expr)
   | Let (x, expr1, expr2) ->
-    (remove x (free_vars expr2)) |> union (free_vars expr1)
+      (remove x (free_vars expr2)) |> union (free_vars expr1)
   | Letrec (x, expr1, expr2) -> 
-    remove x (union (free_vars expr1) (free_vars expr2))
+      remove x (union (free_vars expr1) (free_vars expr2))
   | App (expr1, expr2) -> (free_vars expr1) |> union (free_vars expr2) 
-  | List exprs -> List.fold_left (fun acc exp -> SS.union acc (free_vars exp)) SS.empty exprs
-  ;;
+  | List exprs -> List.fold_left (fun acc exp -> 
+      SS.union acc (free_vars exp)) SS.empty exprs
+;;
   
 (* new_varname () -- Returns a freshly minted `varid` with prefix
    "var" and a running counter a la `gensym`. Assumes no other
@@ -145,7 +146,8 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
       else if not (SS.mem x (free_vars repl)) then
           Letrec (x, subst var_name repl expr1, subst var_name repl expr2)
       else
-          let new_var = if SS.mem x (free_vars repl) then new_varname () else x in
+          let new_var = if SS.mem x (free_vars repl) 
+                        then new_varname () else x in
           Letrec (new_var, 
                   subst var_name repl (subst x (Var new_var) expr1),
                   subst var_name repl (subst x (Var new_var) expr2))
@@ -158,14 +160,6 @@ let rec subst (var_name : varid) (repl : expr) (exp : expr) : expr =
   String representations of expressions
  *)
 
- let type_of_expr (expr : expr) : string =
-  match expr with
-  | Num _ -> "Int"
-  | Float _ -> "Float"
-  | Bool _ -> "Bool"
-  | String _ -> "String"
-  | _ -> "Other"
-   
 (* exp_to_concrete_string exp -- Returns a string representation of
    the concrete syntax of the expression `exp` *)
 let rec exp_to_concrete_string (exp : expr) : string =
@@ -179,12 +173,16 @@ let rec exp_to_concrete_string (exp : expr) : string =
     (match unop with 
       | Negate -> "-" ^ exp_to_concrete_string expr)
   | Binop (binop, expr1, expr2) -> 
-    let type1 = type_of_expr expr1 in
-    let type2 = type_of_expr expr2 in
     let operator = match binop with
-      | Plus -> if type1 = "Float" || type2 = "Float" then " +. " else " + "
-      | Minus -> if type1 = "Float" || type2 = "Float" then " -. " else " - "
-      | Times -> if type1 = "Float" || type2 = "Float" then " *. " else " * "
+      | Plus -> (match (expr1, expr2) with
+                 | (Float _, _) | (_, Float _) -> " +. "
+                 | _ -> " + ")
+      | Minus -> (match (expr1, expr2) with
+                  | (Float _, _) | (_, Float _) -> " -. "
+                  | _ -> " - ")
+      | Times -> (match (expr1, expr2) with
+                  | (Float _, _) | (_, Float _) -> " *. "
+                  | _ -> " * ")
       | Equals -> " = "
       | NotEquals -> " <> "
       | LessThan -> " < "
@@ -197,8 +195,8 @@ let rec exp_to_concrete_string (exp : expr) : string =
     in
     exp_to_concrete_string expr1 ^ operator ^ exp_to_concrete_string expr2
   | Conditional (expr1, expr2, expr3) -> 
-    "if " ^ exp_to_concrete_string expr1 ^ " then " ^ exp_to_concrete_string expr2
-      ^ " else " ^ exp_to_concrete_string expr3 
+    "if " ^ exp_to_concrete_string expr1 ^ " then " ^ 
+      exp_to_concrete_string expr2 ^ " else " ^ exp_to_concrete_string expr3 
   | Fun (x, expr) -> "fun " ^ x ^ " -> " ^ exp_to_concrete_string expr    
   | Let (x, expr1, expr2) -> 
     "let " ^ x ^ " = " ^ exp_to_concrete_string expr1 ^ " in " 
@@ -208,9 +206,10 @@ let rec exp_to_concrete_string (exp : expr) : string =
       ^ exp_to_concrete_string expr2
   | Raise -> "raise"
   | Unassigned -> "unassigned"
-  | App (expr1, expr2) -> 
-    exp_to_concrete_string expr1 ^ " " ^ exp_to_concrete_string expr2
-  | List exprs -> "[" ^ String.concat "; " (List.map exp_to_concrete_string exprs) ^ "]"
+  | App (e1, e2) -> "(" ^ exp_to_concrete_string e1 ^ ")" ^ " " ^ "(" ^ 
+                          exp_to_concrete_string e2 ^ ")"
+  | List exprs -> "[" ^ String.concat "; " 
+                      (List.map exp_to_concrete_string exprs) ^ "]"
 ;;
 
 (* exp_to_abstract_string exp -- Return a string representation of the
@@ -241,7 +240,8 @@ let rec exp_to_abstract_string (exp : expr) : string =
                       ^ exp_to_abstract_string expr2 ^ ")"
       | LessThan -> "Binop(LessThan, " ^ exp_to_abstract_string expr1 ^ ", " 
                       ^ exp_to_abstract_string expr2 ^ ")"
-      | GreaterThan -> "Binop(GreaterThan, " ^ exp_to_abstract_string expr1 ^ ", " 
+      | GreaterThan -> "Binop(GreaterThan, " 
+                      ^ exp_to_abstract_string expr1 ^ ", " 
                       ^ exp_to_abstract_string expr2 ^ ")"
       | Power -> "Binop(Power, " ^ exp_to_abstract_string expr1 ^ ", " 
                   ^ exp_to_abstract_string expr2 ^ ")"
@@ -264,6 +264,8 @@ let rec exp_to_abstract_string (exp : expr) : string =
   | Raise -> "Raise"
   | Unassigned -> "Unassigned"
   | App (expr1, expr2) -> 
-    "App(" ^ exp_to_abstract_string expr1 ^ ", " ^ exp_to_abstract_string expr2 ^ ")"
-  | List exprs -> "List(" ^ String.concat ", " (List.map exp_to_abstract_string exprs) ^ ")"
+    "App(" ^ exp_to_abstract_string expr1 ^ ", " 
+        ^ exp_to_abstract_string expr2 ^ ")"
+  | List exprs -> "List(" ^ String.concat ", " 
+        (List.map exp_to_abstract_string exprs) ^ ")"
 ;;
